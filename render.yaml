@@ -1,0 +1,31 @@
+databases:
+  - name: motosur-db
+    plan: free
+    databaseName: motosur
+    user: motosur
+
+services:
+  - type: web
+    name: motosur-mali
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: DB_HOST
+        fromDatabase: { name: motosur-db, property: host }
+      - key: DB_PORT
+        fromDatabase: { name: motosur-db, property: port }
+      - key: DB_NAME
+        fromDatabase: { name: motosur-db, property: database }
+      - key: DB_USER
+        fromDatabase: { name: motosur-db, property: user }
+      - key: DB_PASSWORD
+        fromDatabase: { name: motosur-db, property: password }
+      - key: MAINTENANCE_EMAIL
+        value: aboubacar.c130@icloud.com
+      # Secret : à saisir par le propriétaire dans Render (12 caractères minimum). Jamais dans le code.
+      - key: MAINTENANCE_PASSWORD
+        sync: false
