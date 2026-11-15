@@ -83,7 +83,7 @@
   }
 
   /* ---------- routage ---------- */
-  var VIEWS = ["accueil", "enregistrer", "verifier", "signaler"];
+  var VIEWS = ["accueil", "enregistrer", "verifier", "signaler", "notifications"];
   function route() {
     var v = (location.hash || "#accueil").slice(1); if (VIEWS.indexOf(v) < 0) v = "accueil";
     $$("[data-view]").forEach(function (s) { if (s.tagName === "SECTION") s.hidden = s.getAttribute("data-view") !== v; });
@@ -210,6 +210,50 @@
     }).catch(function (e) { if (e.message === "NOT_OWNER") setErr("f-phone", msg(e)); else toast(msg(e)); })
       .then(function () { busy(f, false); });
   });
+
+
+  /* ---------- cloche de notification ---------- */
+  var KEY = "motosur-owner";
+  function saved() { try { var v = JSON.parse(localStorage.getItem(KEY) || "null"); return v && v.q && v.phone ? v : null; } catch (e) { return null; } }
+  function save(v) { try { if (v) localStorage.setItem(KEY, JSON.stringify(v)); else localStorage.removeItem(KEY); } catch (e) {} }
+  function setBadge(n) { var b = $("#bell-n"); b.textContent = n > 9 ? "9+" : String(n); b.hidden = !n; $("#bell").setAttribute("aria-label", n ? "Mes notifications : " + n + " nouvelle(s)" : "Mes notifications"); }
+  function renderNotes(d, creds) {
+    var out = $("#n-list"); out.replaceChildren();
+    var head = el("div", "actions"); head.appendChild(el("h2", null, "Moto " + d.plate));
+    var off = el("button", "btn btn-ghost btn-sm", "Ne plus me reconnaître"); off.type = "button";
+    off.addEventListener("click", function () { save(null); setBadge(0); out.replaceChildren(); $("#n-form-card").hidden = false; toast("Appareil oublié."); });
+    head.appendChild(off); out.appendChild(head);
+    if (!d.items.length) { out.appendChild(el("p", "note", "Aucune notification pour le moment. Vous serez informé ici dès que votre moto est retrouvée.")); setBadge(0); return; }
+    var wrap = el("div"); wrap.style.cssText = "display:flex;flex-direction:column;gap:12px;margin-top:12px";
+    d.items.forEach(function (n) {
+      var c = el("div", "note-card" + (n.seen ? " seen" : "")); c.appendChild(el("b", null, n.message));
+      c.appendChild(el("time", null, new Date(n.createdAt).toLocaleString("fr-FR", { dateStyle: "long", timeStyle: "short" }))); wrap.appendChild(c);
+    });
+    out.appendChild(wrap);
+    if (d.unread) {
+      post("/api/public/notifications/read", creds).then(function () { setBadge(0); }).catch(function () {});
+    } else setBadge(0);
+  }
+  function loadNotes(creds, quiet) {
+    return post("/api/public/notifications", creds).then(function (d) {
+      if (quiet) { setBadge(d.unread); return d; }
+      $("#n-form-card").hidden = true; renderNotes(d, creds); return d;
+    });
+  }
+  $("#n-form").addEventListener("submit", function (ev) {
+    ev.preventDefault(); var f = ev.target; clearErrs(f);
+    var q = val("n-q"), ph = val("n-phone"), bad = false;
+    if (!q) { setErr("n-q", "Indiquez la plaque ou le châssis."); bad = true; }
+    if (!ph) { setErr("n-phone", "Indiquez le téléphone enregistré."); bad = true; }
+    if (bad) return;
+    var creds = { q: q, phone: ph }; busy(f, true);
+    loadNotes(creds, false).then(function () { if ($("#n-remember").checked) save(creds); })
+      .catch(function (e) { if (e.message === "NOT_OWNER") setErr("n-phone", msg(e)); else toast(msg(e)); }).then(function () { busy(f, false); });
+  });
+  window.addEventListener("hashchange", function () {
+    if (location.hash === "#notifications") { var s = saved(); if (s) loadNotes(s, false).catch(function () { $("#n-form-card").hidden = false; }); }
+  });
+  (function () { var s = saved(); if (!s) return; loadNotes(s, true).then(function () { if (location.hash === "#notifications") loadNotes(s, false); }).catch(function () {}); })();
 
   route();
 })();

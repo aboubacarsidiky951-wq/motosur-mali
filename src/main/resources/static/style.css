@@ -260,3 +260,13 @@ footer .wrap{padding-block:22px;display:flex;justify-content:space-between;gap:1
 #toast.show{opacity:1;transform:none}
 #toast span{background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:10px;font-size:.92rem;box-shadow:var(--shadow)}
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
+
+.bell{position:relative;display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;color:var(--ink);text-decoration:none;border:1.5px solid var(--line)}
+.bell:hover{background:var(--surface-2)}
+.bell-n{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;padding:0 5px;border-radius:99px;background:var(--danger);color:var(--surface);font:700 .75rem/20px var(--font-body);text-align:center}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:.92rem}
+.check input{margin-top:3px;min-height:0;width:auto}
+.note-card{border-left:4px solid var(--ok);background:var(--ok-soft);padding:14px 16px;border-radius:0 10px 10px 0;display:flex;flex-direction:column;gap:6px}
+.note-card.seen{border-left-color:var(--line);background:var(--surface-2)}
+.note-card time{font-size:.8rem;color:var(--ink-2)}
+@media (max-width:920px){.head-row .bell{order:2}}

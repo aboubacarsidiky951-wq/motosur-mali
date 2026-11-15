@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 <header class="site-header">
@@ -23,6 +23,10 @@
       <a href="#verifier" data-view="verifier">Vérifier une moto</a>
       <a href="#signaler" data-view="signaler">Déclarer un vol</a>
     </nav>
+    <a class="bell" href="#notifications" id="bell" aria-label="Mes notifications">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 1 1 12 0c0 6 2 7.5 2 7.5H4S6 15 6 9z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
+      <span class="bell-n" id="bell-n" hidden>0</span>
+    </a>
   </div>
 </header>
 <div class="flag" aria-hidden="true"></div>
@@ -232,6 +236,6 @@
   </div>
 </footer>
 <div id="toast" role="status" aria-live="polite"><span></span></div>
-<script src="public.js?v=4"></script>
+<script src="public.js?v=5"></script>
 </body>
 </html>

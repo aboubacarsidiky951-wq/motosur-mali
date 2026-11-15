@@ -16,6 +16,8 @@ import ml.motosur.domain.Account;
 import ml.motosur.domain.AccountRepository;
 import ml.motosur.domain.Moto;
 import ml.motosur.domain.MotoRepository;
+import ml.motosur.domain.Notification;
+import ml.motosur.domain.NotificationRepository;
 import ml.motosur.domain.Role;
 import ml.motosur.domain.Theft;
 import ml.motosur.domain.TheftRepository;
@@ -40,10 +42,12 @@ public class PoliceController {
     private final AccountRepository accounts;
     private final AuditService audit;
     private final SmsService smsService;
+    private final NotificationRepository notifications;
 
     public PoliceController(MotoRepository motos, TheftRepository thefts, AccountRepository accounts, AuditService audit,
-                            SmsService smsService) {
+                            SmsService smsService, NotificationRepository notifications) {
         this.smsService = smsService;
+        this.notifications = notifications;
         this.motos = motos;
         this.thefts = thefts;
         this.accounts = accounts;
@@ -155,6 +159,11 @@ public class PoliceController {
 
         String sms = "MotoSûr : votre moto " + m.plate + " a été retrouvée. Elle se trouve au " + commissariat
                 + ". Présentez-vous avec vos papiers. Réf. " + t.recoveredReference;
+        Notification note = new Notification();
+        note.moto = m;
+        note.message = "Bonne nouvelle : votre moto " + m.plate + " a été retrouvée. Elle se trouve au " + commissariat
+                + " (" + r.commune() + "). Présentez-vous avec vos papiers. Réf. " + t.recoveredReference;
+        notifications.save(note);
         String last4 = m.ownerPhone.substring(m.ownerPhone.length() - 4);
         audit.log(a.login, "MOTO_RECOVERED", t.recoveredReference + " " + m.plate + " → " + commissariat, req.getRemoteAddr());
         boolean sent = smsService.send(m.ownerPhone, sms);

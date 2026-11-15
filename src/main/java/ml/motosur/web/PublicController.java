@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Map;
 import ml.motosur.domain.Moto;
 import ml.motosur.domain.MotoRepository;
+import ml.motosur.domain.Notification;
+import ml.motosur.domain.NotificationRepository;
 import ml.motosur.domain.Theft;
 import ml.motosur.domain.TheftRepository;
 import ml.motosur.service.AuditService;
@@ -50,11 +52,15 @@ public class PublicController {
 
     private final MotoRepository motos;
     private final TheftRepository thefts;
+    private final NotificationRepository notifications;
     private final AuditService audit;
+    private final RateLimiter notifLimit = new RateLimiter(30, 600_000);
     private final RateLimiter checkLimit = new RateLimiter(40, 60_000);
     private final RateLimiter writeLimit = new RateLimiter(10, 600_000);
 
-    public PublicController(MotoRepository motos, TheftRepository thefts, AuditService audit) {
+    public PublicController(MotoRepository motos, TheftRepository thefts, NotificationRepository notifications,
+                            AuditService audit) {
+        this.notifications = notifications;
         this.motos = motos;
         this.thefts = thefts;
         this.audit = audit;
@@ -216,5 +222,42 @@ public class PublicController {
         motos.save(m);
         audit.log("public", "MOTO_RECOVERED", t.recoveredReference + " " + m.plate, req.getRemoteAddr());
         return ResponseEntity.ok(Map.of("reference", t.recoveredReference, "plate", m.plate));
+    }
+
+    /** Cloche de notification : le propriétaire (plaque + téléphone) lit les messages concernant sa moto. */
+    @PostMapping("/notifications")
+    @Transactional
+    public ResponseEntity<?> myNotifications(@Valid @RequestBody RecoveredRequest r, HttpServletRequest req) {
+        if (!notifLimit.allow(req.getRemoteAddr())) return err(429, "TOO_MANY_REQUESTS");
+        Moto m = owned(r.q(), r.phone());
+        if (m == null) return err(403, "NOT_OWNER");
+        List<Map<String, Object>> items = new java.util.ArrayList<>();
+        long unread = 0;
+        for (Notification n : notifications.findTop20ByMotoOrderByCreatedAtDesc(m)) {
+            Map<String, Object> o = new LinkedHashMap<>();
+            o.put("id", n.id);
+            o.put("message", n.message);
+            o.put("createdAt", n.createdAt);
+            o.put("seen", n.seen);
+            if (!n.seen) unread++;
+            items.add(o);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("plate", m.plate);
+        out.put("unread", unread);
+        out.put("items", items);
+        return ResponseEntity.ok(out);
+    }
+
+    @PostMapping("/notifications/read")
+    @Transactional
+    public ResponseEntity<?> markRead(@Valid @RequestBody RecoveredRequest r, HttpServletRequest req) {
+        if (!notifLimit.allow(req.getRemoteAddr())) return err(429, "TOO_MANY_REQUESTS");
+        Moto m = owned(r.q(), r.phone());
+        if (m == null) return err(403, "NOT_OWNER");
+        for (Notification n : notifications.findTop20ByMotoOrderByCreatedAtDesc(m)) {
+            n.seen = true;
+        }
+        return ResponseEntity.ok(Map.of("ok", true));
     }
 }
