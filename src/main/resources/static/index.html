@@ -1,5 +1,236 @@
 <!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>MotoSûr Mali</title>
-<style>body{margin:0;min-height:100vh;display:grid;place-items:center;font:16px/1.5 system-ui,sans-serif;background:#F4F6F3;color:#13241D;padding:16px}main{max-width:520px}h1{margin:0 0 8px}p{color:#51635A}@media (prefers-color-scheme:dark){body{background:#0E1512;color:#E8F0EB}p{color:#9DB1A6}}</style>
-</head><body><main><h1>MotoSûr Mali</h1><p>Registre national de sécurité des motos. Le service est en cours de mise en place.</p></main></body></html>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap head-row">
+    <a class="brand" href="#accueil">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path class="logo-bg" d="M16 3l11 4v8c0 7-4.6 12.2-11 14C9.6 27.2 5 22 5 15V7l11-4z"/><path class="logo-ck" d="M11 16.5l3.4 3.4L21.5 12" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span><b>MotoSûr</b><small>Mali</small></span>
+    </a>
+    <button id="navToggle" class="btn btn-ghost btn-sm nav-toggle" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
+    <nav id="nav" aria-label="Navigation principale">
+      <a href="#accueil" data-view="accueil">Accueil</a>
+      <a href="#enregistrer" data-view="enregistrer">Enregistrer ma moto</a>
+      <a href="#verifier" data-view="verifier">Vérifier une moto</a>
+      <a href="#signaler" data-view="signaler">Déclarer un vol</a>
+    </nav>
+  </div>
+</header>
+<div class="flag" aria-hidden="true"></div>
+
+<main id="main">
+
+<section data-view="accueil">
+  <div class="hero-band">
+    <div class="wrap hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Registre numérique des motos</p>
+        <h1>Chaque moto volée reconnue en quelques secondes.</h1>
+        <p class="lead">Enregistrez votre moto depuis votre téléphone. En cas de vol, les commissariats de Bamako sont alertés aussitôt, et la police vérifie n’importe quelle moto en saisissant son numéro.</p>
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="#enregistrer">Enregistrer ma moto</a>
+          <a class="btn btn-secondary" href="#verifier">Vérifier l’état de ma moto</a>
+          <a class="btn btn-secondary" href="#signaler">Déclarer un vol</a>
+        </div>
+      </div>
+      <div class="card check-card">
+        <h2>Vérifier une moto</h2>
+        <form id="hero-form" novalidate>
+          <div class="field">
+            <label for="hero-q">Plaque, numéro de châssis ou de moteur</label>
+            <div class="plate"><span class="plate-cc" aria-hidden="true">ML</span><input id="hero-q" class="plate-in" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="BA 1930 ML"></div>
+          </div>
+          <div class="actions" style="margin-top:12px"><button class="btn btn-primary" type="submit">Vérifier</button></div>
+        </form>
+        <div id="hero-result" aria-live="polite"></div>
+      </div>
+    </div>
+    <div class="wrap trust">
+      <span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Ouvert à tous les propriétaires de motos</span>
+      <span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Alerte envoyée à tous les commissariats de Bamako</span>
+      <span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Résultat de la vérification en quelques secondes</span>
+    </div>
+  </div>
+
+  <div class="wrap page">
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div>
+        <h2>Centre d’aide</h2>
+        <p class="note" style="margin-top:6px">Trois guides pour utiliser le site pas à pas.</p>
+      </div>
+      <div class="help-grid">
+        <article class="guide">
+          <h3>Comment enregistrer ma moto</h3>
+          <ol>
+            <li>Préparez les papiers de la moto.</li>
+            <li>Relevez les numéros : la plaque, le numéro de châssis et le numéro de moteur.</li>
+            <li>Remplissez le formulaire « Enregistrer ma moto ».</li>
+            <li>Notez votre référence. </li>
+          </ol>
+        </article>
+        <article class="guide">
+          <h3>Comment vérifier une moto</h3>
+          <ol>
+            <li>Demandez au vendeur la plaque ou le numéro de châssis.</li>
+            <li>Saisissez-le dans « Vérifier une moto ».</li>
+            <li>Lisez le résultat : « En règle », « Signalée volée » ou « Non enregistrée ».</li>
+            <li>Si la moto est signalée volée, ne payez rien et prévenez le commissariat le plus proche.</li>
+          </ol>
+        </article>
+        <article class="guide">
+          <h3>Comment déclarer une moto volée</h3>
+          <ol>
+            <li>Gardez sous la main la plaque ou le numéro de châssis de votre moto.</li>
+            <li>Ouvrez « Déclarer un vol » et retrouvez votre moto dans le registre.</li>
+            <li>Indiquez la date, le lieu et ce qui s’est passé, puis confirmez avec le téléphone enregistré.</li>
+            <li>L’alerte part vers tous les commissariats de Bamako. Si vous retrouvez votre moto, utilisez « Ma moto est retrouvée » sur la même page.</li>
+          </ol>
+        </article>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section data-view="enregistrer" hidden>
+  <div class="wrap page">
+    <div class="page-head">
+      <p class="eyebrow">Propriétaires</p>
+      <h1>Enregistrer ma moto</h1>
+      <p class="lead">Enregistrez votre moto vous-même, sans vous déplacer. Elle est aussitôt reconnue par la police, et les commissariats de Bamako sont informés. Vous recevez une référence à conserver.</p>
+    </div>
+
+    <div class="card" id="reg-card">
+      <form id="reg-form" class="form" novalidate>
+        <fieldset>
+          <legend>Le propriétaire</legend>
+          <div class="grid2">
+            <div class="field"><label for="r-owner">Nom et prénom</label><input id="r-owner" type="text" autocomplete="name" aria-describedby="err-r-owner"><p class="err" id="err-r-owner" hidden></p></div>
+            <div class="field"><label for="r-phone">Téléphone</label><input id="r-phone" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="70 00 00 00" aria-describedby="hint-r-phone err-r-phone"><p class="hint" id="hint-r-phone">8 chiffres, sans l’indicatif +223.</p><p class="err" id="err-r-phone" hidden></p></div>
+            <div class="field"><label for="r-commune">Commune de résidence</label><select id="r-commune" aria-describedby="err-r-commune"></select><p class="err" id="err-r-commune" hidden></p></div>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>La moto</legend>
+          <div class="grid2">
+            <div class="field"><label for="r-plate">Numéro de plaque</label><input id="r-plate" class="mono" type="text" autocapitalize="characters" autocomplete="off" placeholder="BA 1234 ML" aria-describedby="err-r-plate"><p class="err" id="err-r-plate" hidden></p></div>
+            <div class="field"><label for="r-chassis">Numéro de châssis</label><input id="r-chassis" class="mono" type="text" autocapitalize="characters" autocomplete="off" aria-describedby="hint-r-chassis err-r-chassis"><p class="hint" id="hint-r-chassis">Gravé sur le cadre, près de la colonne de direction.</p><p class="err" id="err-r-chassis" hidden></p></div>
+            <div class="field"><label for="r-engine">Numéro de moteur</label><input id="r-engine" class="mono" type="text" autocapitalize="characters" autocomplete="off" aria-describedby="err-r-engine"><p class="err" id="err-r-engine" hidden></p></div>
+            <div class="field"><label for="r-brand">Marque</label><input id="r-brand" type="text" list="brands" autocomplete="off" aria-describedby="err-r-brand"><datalist id="brands"><option value="Yamaha"><option value="Honda"><option value="Haojue"><option value="TVS"><option value="Bajaj"><option value="Suzuki"><option value="Sanili"><option value="Apsonic"><option value="Dayun"><option value="Jincheng"></datalist><p class="err" id="err-r-brand" hidden></p></div>
+            <div class="field"><label for="r-model">Modèle</label><input id="r-model" type="text" autocomplete="off" aria-describedby="err-r-model"><p class="err" id="err-r-model" hidden></p></div>
+            <div class="field"><label for="r-color">Couleur</label><select id="r-color" aria-describedby="err-r-color"><option value="">Choisir</option><option>Noire</option><option>Rouge</option><option>Bleue</option><option>Grise</option><option>Blanche</option><option>Verte</option><option>Jaune</option><option>Autre</option></select><p class="err" id="err-r-color" hidden></p></div>
+            <div class="field"><label for="r-year">Année de mise en circulation</label><input id="r-year" type="number" inputmode="numeric" min="1990" placeholder="2022" aria-describedby="err-r-year"><p class="err" id="err-r-year" hidden></p></div>
+          </div>
+        </fieldset>
+        <div class="actions">
+          <button class="btn btn-primary" type="submit">Enregistrer la moto</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card cert" id="reg-done" hidden aria-live="polite"></div>
+  </div>
+</section>
+
+<section data-view="signaler" hidden>
+  <div class="wrap page">
+    <div class="page-head">
+      <p class="eyebrow">Propriétaires</p>
+      <h1>Déclarer un vol</h1>
+      <p class="lead">Retrouvez votre moto dans le registre, puis décrivez le vol. L’alerte est transmise aux commissariats de Bamako.</p>
+    </div>
+
+    <div class="card" id="s-step1">
+      <form id="s-find-form" class="form" novalidate>
+        <div class="field">
+          <label for="s-q">Plaque ou numéro de châssis de votre moto</label>
+          <div class="plate"><span class="plate-cc" aria-hidden="true">ML</span><input id="s-q" class="plate-in" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="BA 1234 ML"></div>
+          <p class="err" id="err-s-q" hidden></p>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" type="submit">Rechercher ma moto</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card found" id="s-found" hidden></div>
+
+    <div class="card" id="s-step2" hidden>
+      <form id="s-form" class="form" novalidate>
+        <fieldset>
+          <legend>Les circonstances du vol</legend>
+          <div class="grid2">
+            <div class="field"><label for="s-date">Date du vol</label><input id="s-date" type="date" aria-describedby="err-s-date"><p class="err" id="err-s-date" hidden></p></div>
+            <div class="field"><label for="s-commune">Commune</label><select id="s-commune" aria-describedby="err-s-commune"></select><p class="err" id="err-s-commune" hidden></p></div>
+          </div>
+          <div class="field"><label for="s-place">Lieu précis</label><input id="s-place" type="text" placeholder="Quartier, rue, repère connu" aria-describedby="err-s-place"><p class="err" id="err-s-place" hidden></p></div>
+          <div class="field"><label for="s-details">Ce qui s’est passé <span style="font-weight:400;color:var(--ink-2)">(facultatif)</span></label><textarea id="s-details"></textarea></div>
+        </fieldset>
+        <fieldset>
+          <legend>Confirmer que vous êtes le propriétaire</legend>
+          <div class="field" style="max-width:340px"><label for="s-phone">Téléphone enregistré pour cette moto</label><input id="s-phone" type="tel" inputmode="numeric" placeholder="70 00 00 00" aria-describedby="hint-s-phone err-s-phone"><p class="hint" id="hint-s-phone">Seul le propriétaire peut déclarer le vol de sa moto.</p><p class="err" id="err-s-phone" hidden></p></div>
+        </fieldset>
+        <div class="actions"><button class="btn btn-danger" type="submit">Envoyer l’alerte vol</button></div>
+      </form>
+    </div>
+
+    <div class="card cert" id="s-done" hidden aria-live="polite"></div>
+
+    <div class="card" id="found-card" style="display:flex;flex-direction:column;gap:14px">
+      <div>
+        <h2>Vous avez retrouvé votre moto ?</h2>
+        <p class="note" style="margin-top:6px">Levez l’alerte pour que les commissariats ne la recherchent plus. Saisissez la plaque et le téléphone enregistré.</p>
+      </div>
+      <form id="found-form" class="form" novalidate>
+        <div class="grid2">
+          <div class="field"><label for="f-q">Plaque ou numéro de châssis</label><input id="f-q" class="mono" type="text" autocapitalize="characters" autocomplete="off" placeholder="BA 1930 ML" aria-describedby="err-f-q"><p class="err" id="err-f-q" hidden></p></div>
+          <div class="field"><label for="f-phone">Téléphone enregistré</label><input id="f-phone" type="tel" inputmode="numeric" placeholder="70 00 00 00" aria-describedby="err-f-phone"><p class="err" id="err-f-phone" hidden></p></div>
+        </div>
+        <div class="actions"><button class="btn btn-primary" type="submit">Ma moto est retrouvée</button></div>
+      </form>
+      <div id="found-done" aria-live="polite"></div>
+    </div>
+  </div>
+</section>
+
+<section data-view="verifier" hidden>
+  <div class="wrap page">
+    <div class="page-head">
+      <p class="eyebrow">Acheteurs et public</p>
+      <h1>Vérifier une moto</h1>
+      <p class="lead">Avant d’acheter une moto d’occasion, vérifiez qu’elle n’est pas signalée volée. Les informations personnelles du propriétaire ne sont jamais affichées ici.</p>
+    </div>
+    <div class="card check-card" style="max-width:720px">
+      <form id="pub-form" novalidate>
+        <div class="field">
+          <label for="pub-q">Plaque, numéro de châssis ou de moteur</label>
+          <div class="plate"><span class="plate-cc" aria-hidden="true">ML</span><input id="pub-q" class="plate-in" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="BA 1930 ML"></div>
+        </div>
+        <div class="actions" style="margin-top:12px"><button class="btn btn-primary" type="submit">Vérifier</button></div>
+      </form>
+      <div id="pub-result" aria-live="polite"></div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>MotoSûr Mali · registre numérique des motos.</span>
+    <span>Vos informations personnelles ne sont jamais affichées au public.</span>
+  </div>
+</footer>
+<div id="toast" role="status" aria-live="polite"><span></span></div>
+<script src="public.js"></script>
+</body>
+</html>
