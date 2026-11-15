@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Espace réservé · MotoSûr Mali</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap head-row">
+    <a class="brand" href="index.html">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path class="logo-bg" d="M16 3l11 4v8c0 7-4.6 12.2-11 14C9.6 27.2 5 22 5 15V7l11-4z"/><path class="logo-ck" d="M11 16.5l3.4 3.4L21.5 12" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span><b>MotoSûr</b><small>Mali</small></span>
+    </a>
+    <div id="userbar" class="userbar" hidden><span id="who"></span><button type="button" class="btn btn-ghost btn-sm" id="logout">Se déconnecter</button></div>
+  </div>
+</header>
+<div class="flag" aria-hidden="true"></div>
+
+<main class="wrap page" id="main">
+
+  <section id="view-login" hidden>
+    <div class="page-head">
+      <p class="eyebrow">Accès réservé</p>
+      <h1>Connexion</h1>
+      <p class="lead">Réservé à la Direction de la Police nationale, aux commissariats de Bamako et à leurs agents.</p>
+    </div>
+    <div class="card" style="max-width:460px">
+      <form id="login-form" class="form" novalidate>
+        <div class="field"><label for="l-login">Email ou matricule</label><input id="l-login" type="text" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
+        <div class="field"><label for="l-pass">Mot de passe</label><input id="l-pass" type="password" autocomplete="current-password"></div>
+        <p class="err" id="l-err" role="alert" hidden></p>
+        <div class="actions"><button class="btn btn-primary" type="submit">Se connecter</button></div>
+      </form>
+    </div>
+  </section>
+
+  <section id="view-password" hidden>
+    <div class="page-head">
+      <p class="eyebrow">Sécurité</p>
+      <h1>Choisissez votre mot de passe</h1>
+      <p class="lead">Le mot de passe provisoire ne sert qu’une fois. 12 caractères minimum.</p>
+    </div>
+    <div class="card" style="max-width:460px">
+      <form id="pw-form" class="form" novalidate>
+        <div class="field"><label for="p-cur">Mot de passe provisoire</label><input id="p-cur" type="password" autocomplete="current-password"></div>
+        <div class="field"><label for="p-new">Nouveau mot de passe</label><input id="p-new" type="password" autocomplete="new-password"></div>
+        <div class="field"><label for="p-new2">Confirmer</label><input id="p-new2" type="password" autocomplete="new-password"></div>
+        <p class="err" id="p-err" role="alert" hidden></p>
+        <div class="actions"><button class="btn btn-primary" type="submit">Enregistrer</button></div>
+      </form>
+    </div>
+  </section>
+
+  <section id="view-app" hidden>
+    <div class="page-head">
+      <p class="eyebrow" id="role-label"></p>
+      <h1 id="app-title">Espace police</h1>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Espace">
+      <button type="button" role="tab" id="tab-verif" data-tab="verif" aria-selected="true" aria-controls="panel-verif">Vérification sur place</button>
+      <button type="button" role="tab" id="tab-alertes" data-tab="alertes" aria-selected="false" tabindex="-1" aria-controls="panel-alertes">Alertes vol</button>
+      <button type="button" role="tab" id="tab-dash" data-tab="dash" aria-selected="false" tabindex="-1" aria-controls="panel-dash" hidden>Tableau de bord</button>
+    </div>
+
+    <div id="panel-verif" data-panel="verif" role="tabpanel" aria-labelledby="tab-verif">
+      <div class="card check-card">
+        <form id="pol-form" novalidate>
+          <div class="field">
+            <label for="pol-q">Numéro relevé sur la moto (plaque, châssis ou moteur)</label>
+            <div class="plate"><span class="plate-cc" aria-hidden="true">ML</span><input id="pol-q" class="plate-in" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="BA 1930 ML"></div>
+          </div>
+          <div class="actions" style="margin-top:12px"><button class="btn btn-primary" type="submit">Vérifier</button></div>
+        </form>
+        <div id="pol-result" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <div id="panel-alertes" data-panel="alertes" role="tabpanel" aria-labelledby="tab-alertes" hidden>
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="filters">
+          <div class="field"><label for="a-q">Rechercher</label><input id="a-q" type="text" placeholder="Plaque, marque, propriétaire"></div>
+          <div class="field"><label for="a-commune">Commune du vol</label><select id="a-commune"></select></div>
+          <div class="field"><label for="a-status">Statut</label><select id="a-status"><option value="active">Vols en cours</option><option value="recovered">Retrouvées</option><option value="all">Toutes</option></select></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Alerte</th><th>Moto</th><th>Lieu du vol</th><th>Propriétaire</th><th>Statut</th><th></th></tr></thead>
+            <tbody id="a-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-dash" data-panel="dash" role="tabpanel" aria-labelledby="tab-dash" hidden>
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div class="actions"><button type="button" class="btn btn-ghost btn-sm" id="d-refresh">Actualiser</button><span class="note" id="d-updated"></span></div>
+        <div class="grid2" id="d-kpis" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr))"></div>
+        <div><h2 style="margin-bottom:10px">Par commune</h2>
+          <div class="table-wrap"><table><thead><tr><th>Commune</th><th>Motos enregistrées</th><th>Volées (en cours)</th><th>Retrouvées</th></tr></thead><tbody id="d-communes"></tbody></table></div></div>
+        <div><h2 style="margin-bottom:10px">Motos volées en cours</h2>
+          <div class="table-wrap"><table><thead><tr><th>Plaque</th><th>Moto</th><th>Date du vol</th><th>Lieu</th><th>Propriétaire</th></tr></thead><tbody id="d-active"></tbody></table></div></div>
+        <div><h2 style="margin-bottom:10px">Commissariats</h2>
+          <div class="table-wrap"><table><thead><tr><th>Commissariat</th><th>Compte</th><th>Dernière connexion</th></tr></thead><tbody id="d-coms"></tbody></table></div></div>
+      </div>
+    </div>
+
+    <div class="card" id="rec-panel" hidden style="margin-top:20px">
+      <form id="rec-form" class="form" novalidate>
+        <h2 id="rec-title">Moto retrouvée</h2>
+        <div class="grid2">
+          <div class="field" id="rec-com-field"><label for="rec-com">Commissariat où se trouve la moto</label><input id="rec-com" type="text" autocomplete="off"></div>
+          <div class="field"><label for="rec-commune">Commune où elle a été retrouvée</label><select id="rec-commune"></select></div>
+        </div>
+        <p class="err" id="rec-err" role="alert" hidden></p>
+        <div class="actions"><button class="btn btn-primary" type="submit">Confirmer</button><button class="btn btn-ghost" type="button" id="rec-cancel">Annuler</button></div>
+      </form>
+      <div id="rec-done" hidden></div>
+    </div>
+  </section>
+</main>
+<footer><div class="wrap"><span>MotoSûr Mali · espace réservé. Chaque consultation est enregistrée.</span><a href="index.html">Retour au site public</a></div></footer>
+<div id="toast" role="status" aria-live="polite"><span></span></div>
+<script src="espace.js"></script>
+</body>
+</html>

@@ -64,6 +64,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(a -> a
                 .requestMatchers("/api/auth/login", "/api/auth/csrf", "/api/health", "/api/public/**").permitAll()
                 .requestMatchers("/api/maintenance/**").hasRole("MAINTENANCE")
+                .requestMatchers("/api/police/**").hasAnyRole("COMMISSARIAT", "AGENT", "CENTRAL")
+                .requestMatchers("/api/central/**").hasRole("CENTRAL")
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().permitAll())
             .exceptionHandling(e -> e

@@ -69,9 +69,7 @@
   function route() {
     if (!me) { show("view-login"); return; }
     if (me.role !== "MAINTENANCE") {
-      show("view-login");
-      showErr("l-err", "Ce compte n’a pas accès à la maintenance.");
-      api("POST", "/api/auth/logout").catch(function () {}); me = null; return;
+      location.replace("espace.html"); return;
     }
     $("who").textContent = me.name;
     if (me.mustChangePassword) { openPassword(true); return; }
