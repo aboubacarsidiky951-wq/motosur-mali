@@ -75,8 +75,8 @@ public class SecurityConfig {
             .headers(h -> h
                 .contentSecurityPolicy(csp -> csp.policyDirectives(CSP))
                 .frameOptions(f -> f.deny())
-                .httpStrictTransportSecurity(h -> h.includeSubDomains(true).maxAgeInSeconds(31536000))
-                .permissionsPolicyHeader(p -> p.policy("camera=(), microphone=(), geolocation=(), payment=()"))
+                .httpStrictTransportSecurity(hs -> hs.includeSubDomains(true).maxAgeInSeconds(31536000))
+                .permissionsPolicyHeader(pp -> pp.policy("camera=(), microphone=(), geolocation=(), payment=()"))
                 .referrerPolicy(r -> r.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.SAME_ORIGIN)))
             .formLogin(f -> f.disable())
             .httpBasic(b -> b.disable())
