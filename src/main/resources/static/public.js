@@ -5,6 +5,7 @@
 
   var MSG = {
     TOO_MANY_REQUESTS: "Trop de demandes en peu de temps. Patientez quelques minutes.",
+    TOO_MANY_ATTEMPTS: "Trop d’essais pour cette moto. Réessayez dans une heure.",
     INVALID_PHONE: "Numéro de téléphone invalide : 8 chiffres attendus.",
     INVALID_COMMUNE: "Commune invalide.",
     INVALID_YEAR: "Année invalide.",

@@ -4,6 +4,7 @@
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var ERR = {
     INVALID_CREDENTIALS: "Identifiant ou mot de passe incorrect.",
+    TOO_MANY_REQUESTS: "Trop de tentatives. Patientez quelques minutes.",
     LOCKED: "Compte verrouillé après trop d’essais. Réessayez dans 15 minutes.",
     SUSPENDED: "Ce compte est suspendu. Contactez l’administrateur.",
     WRONG_CURRENT_PASSWORD: "Le mot de passe provisoire est incorrect.",

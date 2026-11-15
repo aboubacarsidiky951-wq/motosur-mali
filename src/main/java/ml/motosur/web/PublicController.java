@@ -55,6 +55,15 @@ public class PublicController {
     private final NotificationRepository notifications;
     private final AuditService audit;
     private final RateLimiter notifLimit = new RateLimiter(30, 600_000);
+    /** Au plus 5 téléphones faux par moto et par heure, quelle que soit l'adresse IP. */
+    private final RateLimiter ownerFailLimit = new RateLimiter(5, 3_600_000);
+
+    static final class TooManyAttempts extends RuntimeException {}
+
+    @ExceptionHandler(TooManyAttempts.class)
+    ResponseEntity<Map<String, String>> tooMany() {
+        return err(429, "TOO_MANY_ATTEMPTS");
+    }
     private final RateLimiter checkLimit = new RateLimiter(40, 60_000);
     private final RateLimiter writeLimit = new RateLimiter(10, 600_000);
 
@@ -167,7 +176,13 @@ public class PublicController {
         String n = norm(q);
         if (ph == null || n.length() < 4) return null;
         Moto m = motos.findFirstByPlateOrChassisOrEngine(n, n, n).orElse(null);
-        return m != null && m.ownerPhone.equals(ph) ? m : null;
+        if (m == null) return null;
+        if (ownerFailLimit.blocked(m.plate)) throw new TooManyAttempts();
+        if (!m.ownerPhone.equals(ph)) {
+            ownerFailLimit.hit(m.plate);
+            return null;
+        }
+        return m;
     }
 
     @GetMapping("/lookup")

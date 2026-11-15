@@ -15,21 +15,37 @@ final class RateLimiter {
         this.windowMs = windowMs;
     }
 
-    boolean allow(String key) {
+    /** Vrai si la clé a déjà atteint sa limite (sans enregistrer d'appel). */
+    boolean blocked(String key) {
+        Deque<Long> q = hits.get(key);
+        if (q == null) {
+            return false;
+        }
         long now = System.currentTimeMillis();
+        synchronized (q) {
+            while (!q.isEmpty() && now - q.peekFirst() > windowMs) {
+                q.pollFirst();
+            }
+            return q.size() >= max;
+        }
+    }
+
+    /** Enregistre un appel, même au-delà de la limite. */
+    void hit(String key) {
         if (hits.size() > 10_000) {
             hits.clear();
         }
         Deque<Long> q = hits.computeIfAbsent(key, k -> new ArrayDeque<>());
         synchronized (q) {
-            while (!q.isEmpty() && now - q.peekFirst() > windowMs) {
-                q.pollFirst();
-            }
-            if (q.size() >= max) {
-                return false;
-            }
-            q.addLast(now);
-            return true;
+            q.addLast(System.currentTimeMillis());
         }
+    }
+
+    boolean allow(String key) {
+        if (blocked(key)) {
+            return false;
+        }
+        hit(key);
+        return true;
     }
 }

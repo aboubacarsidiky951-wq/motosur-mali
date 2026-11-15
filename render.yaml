@@ -3,6 +3,7 @@ databases:
     plan: free
     databaseName: motosur
     user: motosur
+    ipAllowList: []
 
 services:
   - type: web

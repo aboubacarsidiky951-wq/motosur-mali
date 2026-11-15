@@ -46,6 +46,7 @@ public class AuthController {
     private final SecurityContextRepository contextRepository;
     private final AuditService audit;
     private final String dummyHash;
+    private final RateLimiter loginLimit = new RateLimiter(20, 600_000);
 
     public AuthController(AccountRepository accounts, PasswordEncoder encoder,
                           SecurityContextRepository contextRepository, AuditService audit) {
@@ -66,6 +67,9 @@ public class AuthController {
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest r, HttpServletRequest req,
                                    HttpServletResponse res) {
         String ip = req.getRemoteAddr();
+        if (!loginLimit.allow(ip)) {
+            return ResponseEntity.status(429).body(Map.of("error", "TOO_MANY_REQUESTS"));
+        }
         String login = r.login().trim();
         Account a = accounts.findByLoginIgnoreCase(login).orElse(null);
         Instant now = Instant.now();
