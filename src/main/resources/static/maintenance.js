@@ -67,7 +67,7 @@
 
   /* ---------- Navigation ---------- */
   function route() {
-    if (!me) { show("view-login"); return; }
+    if (!me) { location.replace("espace.html"); return; }
     if (me.role !== "MAINTENANCE") {
       location.replace("espace.html"); return;
     }
