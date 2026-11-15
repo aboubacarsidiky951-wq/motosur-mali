@@ -105,6 +105,27 @@
   </div>
 </section>
 
+<section data-view="notifications" hidden>
+  <div class="wrap page">
+    <div class="page-head">
+      <p class="eyebrow">Propriétaires</p>
+      <h1>Mes notifications</h1>
+      <p class="lead">Si votre moto est retrouvée, le message du commissariat apparaît ici. Saisissez la plaque et le téléphone enregistrés pour le lire.</p>
+    </div>
+    <div class="card" id="n-form-card">
+      <form id="n-form" class="form" novalidate>
+        <div class="grid2">
+          <div class="field"><label for="n-q">Plaque ou numéro de châssis</label><input id="n-q" class="mono" type="text" autocapitalize="characters" autocomplete="off" aria-describedby="err-n-q"><p class="err" id="err-n-q" hidden></p></div>
+          <div class="field"><label for="n-phone">Téléphone enregistré</label><input id="n-phone" type="tel" inputmode="numeric" placeholder="70 00 00 00" aria-describedby="err-n-phone"><p class="err" id="err-n-phone" hidden></p></div>
+        </div>
+        <label class="check"><input id="n-remember" type="checkbox"> Me reconnaître sur cet appareil (la cloche m’avertira à chaque visite)</label>
+        <div class="actions"><button class="btn btn-primary" type="submit">Voir mes notifications</button></div>
+      </form>
+    </div>
+    <div id="n-list" aria-live="polite"></div>
+  </div>
+</section>
+
 <section data-view="enregistrer" hidden>
   <div class="wrap page">
     <div class="page-head">
@@ -236,6 +257,6 @@
   </div>
 </footer>
 <div id="toast" role="status" aria-live="polite"><span></span></div>
-<script src="public.js?v=5"></script>
+<script src="public.js?v=6"></script>
 </body>
 </html>
