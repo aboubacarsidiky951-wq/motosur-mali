@@ -20,6 +20,7 @@ import ml.motosur.domain.Role;
 import ml.motosur.domain.Theft;
 import ml.motosur.domain.TheftRepository;
 import ml.motosur.service.AuditService;
+import ml.motosur.service.SmsService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,8 +39,11 @@ public class PoliceController {
     private final TheftRepository thefts;
     private final AccountRepository accounts;
     private final AuditService audit;
+    private final SmsService smsService;
 
-    public PoliceController(MotoRepository motos, TheftRepository thefts, AccountRepository accounts, AuditService audit) {
+    public PoliceController(MotoRepository motos, TheftRepository thefts, AccountRepository accounts, AuditService audit,
+                            SmsService smsService) {
+        this.smsService = smsService;
         this.motos = motos;
         this.thefts = thefts;
         this.accounts = accounts;
@@ -153,13 +157,15 @@ public class PoliceController {
                 + ". Présentez-vous avec vos papiers. Réf. " + t.recoveredReference;
         String last4 = m.ownerPhone.substring(m.ownerPhone.length() - 4);
         audit.log(a.login, "MOTO_RECOVERED", t.recoveredReference + " " + m.plate + " → " + commissariat, req.getRemoteAddr());
-        audit.log("système", "SMS_NON_ENVOYE", "À ****" + last4 + " : " + sms + " (fournisseur SMS non configuré)", null);
+        boolean sent = smsService.send(m.ownerPhone, sms);
+        audit.log("système", sent ? "SMS_ENVOYE" : "SMS_NON_ENVOYE",
+                "À ****" + last4 + " : " + sms + (sent ? "" : smsService.enabled() ? " (refusé par le fournisseur)" : " (fournisseur SMS non configuré)"), null);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("reference", t.recoveredReference);
         out.put("plate", m.plate);
         out.put("commissariat", commissariat);
         out.put("sms", sms);
-        out.put("smsSent", false);
+        out.put("smsSent", sent);
         return ResponseEntity.ok(out);
     }
 }

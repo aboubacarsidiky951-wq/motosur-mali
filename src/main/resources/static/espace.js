@@ -194,8 +194,8 @@
     api("POST", "/api/police/motos/" + recTarget + "/recovered", { commissariat: com, commune: $("#rec-commune").value }).then(function (d) {
       f.hidden = true; var done = $("#rec-done"); done.replaceChildren(); done.hidden = false;
       done.appendChild(status("ok", "Moto marquée retrouvée", d.plate + " · remise au " + d.commissariat + " · réf. " + d.reference));
-      done.appendChild(el("p", "note", "Message prévu pour le propriétaire : « " + d.sms + " »"));
-      done.appendChild(el("p", "note", "L’envoi automatique de SMS n’est pas encore activé : contactez le propriétaire par téléphone."));
+      done.appendChild(el("p", "note", (d.smsSent ? "SMS envoyé au propriétaire : « " : "Message prévu pour le propriétaire : « ") + d.sms + " »"));
+      if (!d.smsSent) done.appendChild(el("p", "note", "Le SMS n’a pas pu partir : contactez le propriétaire par téléphone."));
       var b = el("button", "btn btn-ghost", "Fermer"); b.type = "button"; b.addEventListener("click", function () { closeRec(); loadAlerts(); var r = $("#pol-result"); r.replaceChildren(); }); done.appendChild(b);
     }).catch(function (e) { if (e.status === 401 || e.status === 403) authLoss(e); else showErr("rec-err", msg(e)); }).then(function () { busy(f, false); });
   });
