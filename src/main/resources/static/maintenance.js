@@ -67,9 +67,9 @@
 
   /* ---------- Navigation ---------- */
   function route() {
-    if (!me) { location.replace("espace.html"); return; }
+    if (!me) { location.replace("espace.html?v=4"); return; }
     if (me.role !== "MAINTENANCE") {
-      location.replace("espace.html"); return;
+      location.replace("espace.html?v=4"); return;
     }
     $("who").textContent = me.name;
     if (me.mustChangePassword) { openPassword(true); return; }
