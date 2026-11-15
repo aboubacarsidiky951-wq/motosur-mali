@@ -66,6 +66,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/maintenance/**").hasRole("MAINTENANCE")
                 .requestMatchers("/api/police/**").hasAnyRole("COMMISSARIAT", "AGENT", "CENTRAL")
                 .requestMatchers("/api/central/**").hasRole("CENTRAL")
+                .requestMatchers("/api/admin/**").hasAnyRole("CENTRAL", "COMMISSARIAT")
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().permitAll())
             .exceptionHandling(e -> e

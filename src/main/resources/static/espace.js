@@ -9,6 +9,11 @@
     WRONG_CURRENT_PASSWORD: "Le mot de passe provisoire est incorrect.",
     WEAK_PASSWORD: "Mot de passe refusé : 12 caractères minimum, différent du provisoire.",
     NOT_STOLEN: "Cette moto n’est plus signalée volée.",
+    INVALID_LOGIN: "Identifiant invalide (email pour un commissariat, matricule pour un agent).",
+    COMMISSARIAT_REQUIRED: "Indiquez le commissariat.",
+    ALREADY_EXISTS: "Ce compte existe déjà.",
+    ROLE_NOT_ALLOWED: "Vous ne pouvez pas créer ce niveau de compte.",
+    NOT_FOUND: "Compte introuvable.",
     INVALID_COMMUNE: "Commune invalide."
   };
   var ROLE = { CENTRAL: "Direction générale", COMMISSARIAT: "Commissariat", AGENT: "Agent de terrain" };
@@ -66,6 +71,12 @@
     $("#app-title").textContent = me.role === "CENTRAL" ? "Direction générale" : "Espace police";
     $("#tab-dash").hidden = me.role !== "CENTRAL";
     $("#rec-com-field").hidden = me.role !== "CENTRAL";
+    var canAdmin = me.role === "CENTRAL" || me.role === "COMMISSARIAT";
+    $("#tab-comptes").hidden = !canAdmin;
+    $("#a-role-field").hidden = me.role !== "CENTRAL";
+    $("#a-com-field").hidden = me.role !== "CENTRAL";
+    $("#acc-title").textContent = me.role === "CENTRAL" ? "Créer un compte commissariat ou agent" : "Créer un compte agent pour votre commissariat";
+    syncRole();
     show("view-app"); selectTab("verif");
   }
   function selectTab(name) {
@@ -74,6 +85,7 @@
     closeRec();
     if (name === "alertes") loadAlerts();
     if (name === "dash") loadDash();
+    if (name === "comptes") loadAccounts();
   }
   $$("[data-tab]").forEach(function (b) {
     b.addEventListener("click", function () { selectTab(b.getAttribute("data-tab")); });
@@ -186,6 +198,60 @@
       done.appendChild(el("p", "note", "L’envoi automatique de SMS n’est pas encore activé : contactez le propriétaire par téléphone."));
       var b = el("button", "btn btn-ghost", "Fermer"); b.type = "button"; b.addEventListener("click", function () { closeRec(); loadAlerts(); var r = $("#pol-result"); r.replaceChildren(); }); done.appendChild(b);
     }).catch(function (e) { if (e.status === 401 || e.status === 403) authLoss(e); else showErr("rec-err", msg(e)); }).then(function () { busy(f, false); });
+  });
+
+
+  /* ---------- comptes (Direction : commissariats et agents ; commissariat : ses agents) ---------- */
+  var ROLES = { COMMISSARIAT: "Commissariat", AGENT: "Agent" };
+  function curRole() { return me.role === "CENTRAL" ? $("#a-role").value : "AGENT"; }
+  function syncRole() {
+    var agent = curRole() === "AGENT";
+    $("#a-login-label").textContent = agent ? "Matricule de l’agent" : "Email du commissariat";
+  }
+  $("#a-role").addEventListener("change", syncRole);
+  function secretBox(title, login, pw) {
+    var b = $("#secret"); b.replaceChildren();
+    b.appendChild(el("b", null, title + " : " + login));
+    b.appendChild(el("p", "note", "Mot de passe provisoire, affiché une seule fois. Transmettez-le de façon sûre : il devra être changé à la première connexion."));
+    var p = el("div", "mono", pw); p.style.cssText = "font-size:1.3rem;font-weight:600;letter-spacing:.08em;user-select:all;overflow-wrap:anywhere;margin:6px 0"; b.appendChild(p);
+    var row = el("div", "actions");
+    var c = el("button", "btn btn-ghost btn-sm", "Copier"); c.type = "button";
+    c.addEventListener("click", function () { if (navigator.clipboard) navigator.clipboard.writeText(pw).then(function () { toast("Copié."); }, function () { toast("Sélectionnez le texte pour le copier."); }); });
+    var x = el("button", "btn btn-ghost btn-sm", "Masquer"); x.type = "button";
+    x.addEventListener("click", function () { b.hidden = true; b.replaceChildren(); });
+    row.appendChild(c); row.appendChild(x); b.appendChild(row); b.hidden = false; b.scrollIntoView({ block: "nearest" });
+  }
+  function loadAccounts() {
+    api("GET", "/api/admin/accounts").then(function (list) {
+      var body = $("#acc-body"); body.replaceChildren();
+      if (!list.length) { emptyRow(body, 5, "Aucun compte pour le moment."); return; }
+      list.forEach(function (a) {
+        var c1 = el("td"); c1.appendChild(el("b", null, a.name)); c1.appendChild(el("small", "mono", a.login)); if (a.commissariat) c1.appendChild(el("small", null, a.commissariat));
+        var c3 = el("td"), locked = a.lockedUntil && new Date(a.lockedUntil) > new Date();
+        c3.appendChild(el("span", "pill " + (!a.active ? "pill-bad" : locked ? "pill-warn" : "pill-ok"), !a.active ? "Suspendu" : locked ? "Verrouillé" : "Actif"));
+        if (a.mustChangePassword) c3.appendChild(el("small", null, "Mot de passe provisoire"));
+        var c5 = el("td"), act = el("div", "actions");
+        var t = el("button", "btn btn-ghost btn-sm", a.active ? "Suspendre" : "Réactiver"); t.type = "button";
+        t.addEventListener("click", function () { api("POST", "/api/admin/accounts/" + a.id + "/active", { active: !a.active }).then(function () { toast(a.active ? "Compte suspendu." : "Compte réactivé."); loadAccounts(); }).catch(authLoss); });
+        var r = el("button", "btn btn-ghost btn-sm", "Nouveau mot de passe"); r.type = "button";
+        r.addEventListener("click", function () {
+          if (r.dataset.arm !== "1") { r.dataset.arm = "1"; r.textContent = "Confirmer ?"; setTimeout(function () { r.dataset.arm = ""; r.textContent = "Nouveau mot de passe"; }, 4000); return; }
+          api("POST", "/api/admin/accounts/" + a.id + "/reset-password").then(function (res) { secretBox("Nouveau mot de passe", a.login, res.temporaryPassword); loadAccounts(); }).catch(authLoss);
+        });
+        act.appendChild(t); act.appendChild(r); c5.appendChild(act);
+        row(body, [c1, ROLES[a.role] || a.role, c3, fmtDT(a.lastLoginAt), c5]);
+      });
+    }).catch(authLoss);
+  }
+  $("#acc-form").addEventListener("submit", function (ev) {
+    ev.preventDefault(); showErr("a-err", ""); var f = ev.target, role = curRole();
+    var body = { login: $("#a-login").value.trim(), name: $("#a-name").value.trim(), role: role, commissariat: me.role === "CENTRAL" ? $("#a-com").value.trim() : "" };
+    if (!body.login || !body.name) { showErr("a-err", "Renseignez l’identifiant et le nom."); return; }
+    if (me.role === "CENTRAL" && !body.commissariat) { showErr("a-err", "Indiquez le commissariat."); return; }
+    busy(f, true);
+    api("POST", "/api/admin/accounts", body).then(function (res) {
+      secretBox("Compte créé", res.account.login, res.temporaryPassword); f.reset(); syncRole(); loadAccounts();
+    }).catch(function (e) { if (e.status === 401 || e.status === 403) authLoss(e); else showErr("a-err", msg(e)); }).then(function () { busy(f, false); });
   });
 
   /* ---------- tableau de bord (Direction) ---------- */

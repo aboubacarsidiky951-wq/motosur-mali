@@ -65,6 +65,7 @@
     <div class="tabs" role="tablist" aria-label="Espace">
       <button type="button" role="tab" id="tab-verif" data-tab="verif" aria-selected="true" aria-controls="panel-verif">Vérification sur place</button>
       <button type="button" role="tab" id="tab-alertes" data-tab="alertes" aria-selected="false" tabindex="-1" aria-controls="panel-alertes">Alertes vol</button>
+      <button type="button" role="tab" id="tab-comptes" data-tab="comptes" aria-selected="false" tabindex="-1" aria-controls="panel-comptes" hidden>Comptes</button>
       <button type="button" role="tab" id="tab-dash" data-tab="dash" aria-selected="false" tabindex="-1" aria-controls="panel-dash" hidden>Tableau de bord</button>
     </div>
 
@@ -92,6 +93,32 @@
           <table>
             <thead><tr><th>Alerte</th><th>Moto</th><th>Lieu du vol</th><th>Propriétaire</th><th>Statut</th><th></th></tr></thead>
             <tbody id="a-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-comptes" data-panel="comptes" role="tabpanel" aria-labelledby="tab-comptes" hidden>
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div class="card">
+          <form id="acc-form" class="form" novalidate>
+            <h2 id="acc-title">Créer un compte</h2>
+            <p class="note">Un mot de passe provisoire est généré et affiché une seule fois. La personne devra le changer à sa première connexion.</p>
+            <div class="grid2">
+              <div class="field" id="a-role-field"><label for="a-role">Niveau</label><select id="a-role"><option value="COMMISSARIAT">Commissariat</option><option value="AGENT">Agent de terrain</option></select></div>
+              <div class="field"><label for="a-login" id="a-login-label">Email du commissariat</label><input id="a-login" type="text" autocomplete="off" autocapitalize="none" spellcheck="false"></div>
+              <div class="field"><label for="a-name">Nom affiché</label><input id="a-name" type="text" autocomplete="off"></div>
+              <div class="field" id="a-com-field"><label for="a-com">Commissariat</label><input id="a-com" type="text" autocomplete="off" placeholder="Commissariat du 1er arrondissement"></div>
+            </div>
+            <p class="err" id="a-err" role="alert" hidden></p>
+            <div class="actions"><button class="btn btn-primary" type="submit">Créer le compte</button></div>
+          </form>
+        </div>
+        <div class="callout" id="secret" hidden role="status" style="border-left-color:var(--warn);background:var(--warn-soft)"></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Compte</th><th>Niveau</th><th>État</th><th>Dernière connexion</th><th></th></tr></thead>
+            <tbody id="acc-body"></tbody>
           </table>
         </div>
       </div>
