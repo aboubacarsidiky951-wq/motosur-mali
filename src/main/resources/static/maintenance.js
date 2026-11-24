@@ -263,13 +263,26 @@
       });
       groupRows("cash-agents", d.byAgent); groupRows("cash-sections", d.bySection);
       var body = $("cash-journal"); body.replaceChildren();
-      if (!d.journal.length) { var r = el("tr"), c = el("td", null, "Aucun enregistrement pour le moment."); c.colSpan = 10; r.appendChild(c); body.appendChild(r); }
+      if (!d.journal.length) { var r = el("tr"), c = el("td", null, "Aucun enregistrement pour le moment."); c.colSpan = 11; r.appendChild(c); body.appendChild(r); }
       d.journal.forEach(function (j) {
         var tr = el("tr"); cell(tr, fmt(j.at)); cell(tr, j.receipt, "mono"); cell(tr, j.plate, "mono"); cell(tr, j.ownerName); cell(tr, phoneFmt(j.ownerPhone), "mono");
-        cell(tr, money(j.amount)); cell(tr, j.mode); cell(tr, j.agent); cell(tr, j.checkedBy); cell(tr, j.section); body.appendChild(tr);
+        cell(tr, money(j.amount)); cell(tr, j.mode); cell(tr, j.agent); cell(tr, j.checkedBy); cell(tr, j.section);
+        var tdp = el("td"), pb = el("button", "btn btn-ghost btn-sm", "Imprimer le reçu"); pb.type = "button";
+        pb.addEventListener("click", function () { printPayment(j); }); tdp.appendChild(pb); tr.appendChild(tdp); body.appendChild(tr);
       });
       $("cash-updated").textContent = "Actualisé à " + new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
     }).catch(handleAuthLoss);
+  }
+  function printPayment(j) {
+    var n = el("div"), dl = el("dl");
+    n.appendChild(el("h1", null, "MotoSûr Mali · Reçu de paiement"));
+    n.appendChild(el("p", "pz-sub", "N° " + j.receipt + " · " + fmt(j.at) + " · " + (j.section || "") + " · DUPLICATA"));
+    [["Payé par", j.ownerName], ["Téléphone", phoneFmt(j.ownerPhone)], ["Plaque", j.plate], ["N° d’enregistrement", j.reference], ["Montant payé", money(j.amount) + " (" + j.mode + ")"], ["Enregistré par", j.agent + " · relu par " + j.checkedBy]].forEach(function (r) {
+      dl.appendChild(el("dt", null, r[0])); dl.appendChild(el("dd", null, r[1] == null ? "—" : String(r[1])));
+    });
+    n.appendChild(dl);
+    n.appendChild(el("p", "pz-note", "Ce duplicata ne porte pas le code secret du propriétaire. Cachet et signature du bureau :"));
+    $("print-zone").replaceChildren(n); document.body.classList.add("printing"); window.print();
   }
   $("cash-refresh").addEventListener("click", loadCash);
   $("cash-print").addEventListener("click", function () {
