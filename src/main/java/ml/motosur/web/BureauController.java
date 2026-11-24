@@ -109,6 +109,9 @@ public class BureauController {
         if (!MODES.contains(r.paymentMode())) throw new ApiException(400, "INVALID_PAYMENT_MODE");
         String checker = r.checkedBy().trim();
         if (checker.equalsIgnoreCase(who.name)) throw new ApiException(400, "SAME_CHECKER");
+        if (!accounts.existsByNameIgnoreCaseAndSectionAndActiveTrue(checker, who.section)) {
+            throw new ApiException(400, "CHECKER_UNKNOWN");
+        }
         String plate = PublicController.norm(r.plate());
         String chassis = PublicController.norm(r.chassis());
         String engine = PublicController.norm(r.engine());
@@ -186,6 +189,7 @@ public class BureauController {
     @Transactional
     public ResponseEntity<?> resetPin(@PathVariable Long id, HttpServletRequest req) {
         Account who = me();
+        if (who.role != ml.motosur.domain.Role.BUREAU_RESP) throw new ApiException(403, "RESP_ONLY");
         Moto m = motos.findById(id).orElse(null);
         if (m == null) throw new ApiException(404, "NOT_FOUND");
         String pin = newPin();

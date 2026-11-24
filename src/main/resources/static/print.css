@@ -12,5 +12,10 @@
   #print-zone dt { color: #333; }
   #print-zone dd { margin: 0; font-weight: 600; }
   #print-zone .pz-code { font: 700 26px/1.2 "IBM Plex Mono", monospace; letter-spacing: .3em; border: 2px solid #000; display: inline-block; padding: 2mm 5mm; margin: 2mm 0; }
+  #print-zone .pz-head { border-bottom: 3px double #000; padding-bottom: 3mm; margin-bottom: 4mm; }
+  #print-zone .pz-head small { display: block; letter-spacing: .12em; text-transform: uppercase; font-size: 10px; color: #333; }
+  #print-zone .pz-sign { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; margin-top: 8mm; }
+  #print-zone .pz-sign div { border: 1px solid #000; height: 28mm; padding: 1.5mm 2mm; font-size: 10px; color: #333; }
+  #print-zone .pz-foot { margin-top: 6mm; font-size: 10px; color: #333; text-align: center; }
   #print-zone .pz-note { margin-top: 6mm; font-size: 11px; border-top: 1px solid #000; padding-top: 3mm; }
 }

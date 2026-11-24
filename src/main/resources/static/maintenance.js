@@ -275,13 +275,14 @@
   }
   function printPayment(j) {
     var n = el("div"), dl = el("dl");
-    n.appendChild(el("h1", null, "MotoSûr Mali · Reçu de paiement"));
+    var hd = el("div", "pz-head"); hd.appendChild(el("small", null, "République du Mali · Registre des motos")); hd.appendChild(el("h1", null, "MotoSûr Mali · Reçu de paiement")); n.appendChild(hd);
     n.appendChild(el("p", "pz-sub", "N° " + j.receipt + " · " + fmt(j.at) + " · " + (j.section || "") + " · DUPLICATA"));
     [["Payé par", j.ownerName], ["Téléphone", phoneFmt(j.ownerPhone)], ["Plaque", j.plate], ["N° d’enregistrement", j.reference], ["Montant payé", money(j.amount) + " (" + j.mode + ")"], ["Enregistré par", j.agent + " · relu par " + j.checkedBy]].forEach(function (r) {
       dl.appendChild(el("dt", null, r[0])); dl.appendChild(el("dd", null, r[1] == null ? "—" : String(r[1])));
     });
     n.appendChild(dl);
-    n.appendChild(el("p", "pz-note", "Ce duplicata ne porte pas le code secret du propriétaire. Cachet et signature du bureau :"));
+    n.appendChild(el("p", "pz-note", "Ce duplicata ne porte pas le code secret du propriétaire. Conservez-le avec les papiers de la moto."));
+    var sg = el("div", "pz-sign"); sg.appendChild(el("div", null, "Signature du client")); sg.appendChild(el("div", null, "Cachet et signature du bureau")); n.appendChild(sg);
     $("print-zone").replaceChildren(n); document.body.classList.add("printing"); window.print();
   }
   $("cash-refresh").addEventListener("click", loadCash);

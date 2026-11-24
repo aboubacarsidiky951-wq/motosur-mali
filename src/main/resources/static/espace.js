@@ -24,6 +24,8 @@
     INVALID_PAYMENT_MODE: "Mode de paiement invalide.",
     CHECKS_REQUIRED: "Cochez les deux contrôles avant d’enregistrer.",
     SAME_CHECKER: "Le second agent doit être une autre personne que vous.",
+    CHECKER_UNKNOWN: "Le second agent doit avoir un compte actif dans votre bureau. Vérifiez son nom exact.",
+    RESP_ONLY: "Seul le responsable du bureau peut refaire un code secret.",
     PLATE_EXISTS: "Cette plaque est déjà enregistrée.",
     CHASSIS_EXISTS: "Ce numéro de châssis est déjà enregistré.",
     ENGINE_EXISTS: "Ce numéro de moteur est déjà enregistré.",
@@ -290,12 +292,14 @@
   }
   function receiptNode(d) {
     var n = el("div");
-    n.appendChild(el("h1", null, "MotoSûr Mali · Reçu d’enregistrement"));
+    var hd = el("div", "pz-head"); hd.appendChild(el("small", null, "République du Mali · Registre des motos")); hd.appendChild(el("h1", null, "MotoSûr Mali · Reçu d’enregistrement")); n.appendChild(hd);
     n.appendChild(el("p", "pz-sub", d.receipt + " · " + fmtDT(d.registeredAt) + " · " + (d.section || "")));
     n.appendChild(pzDl([["Propriétaire", d.ownerName], ["Téléphone", phone(d.ownerPhone)], ["Plaque", d.plate], ["Marque et modèle", d.brand + " " + d.model + " · " + d.color + " · " + d.year], ["N° de châssis", d.chassis], ["N° de moteur", d.engine], ["Montant payé", d.amount + " FCFA (" + d.paymentMode + ")"], ["Enregistré par", d.agent + " · relu par " + d.checkedBy]]));
     n.appendChild(el("h2", null, "Numéro d’enregistrement : " + d.reference));
     n.appendChild(el("div", "pz-code", d.pin));
     n.appendChild(el("p", "pz-note", "Gardez ce reçu. Le numéro d’enregistrement et le code secret permettent de déclarer un vol ou de lever l’alerte. Ne donnez le code à personne."));
+    var sg = el("div", "pz-sign"); sg.appendChild(el("div", null, "Signature du propriétaire")); sg.appendChild(el("div", null, "Cachet et signature du bureau")); n.appendChild(sg);
+    n.appendChild(el("p", "pz-foot", "MotoSûr Mali · Ce reçu prouve l’enregistrement de la moto au registre. Il ne remplace pas les papiers de la moto."));
     return n;
   }
 
@@ -332,7 +336,7 @@
       var body = $("#mine-body"); body.replaceChildren();
       if (!list.length) { emptyRow(body, 5, "Aucun enregistrement pour le moment."); return; }
       list.forEach(function (m) {
-        var act = el("td"), b = el("button", "btn btn-ghost btn-sm", "Nouveau code secret"); b.type = "button";
+        var act = el("td"), b = el("button", "btn btn-ghost btn-sm", "Nouveau code secret"); b.type = "button"; if (me.role !== "BUREAU_RESP") b.hidden = true;
         b.addEventListener("click", function () {
           if (b.dataset.arm !== "1") { b.dataset.arm = "1"; b.textContent = "Confirmer ?"; setTimeout(function () { b.dataset.arm = ""; b.textContent = "Nouveau code secret"; }, 4000); return; }
           api("POST", "/api/bureau/motos/" + m.id + "/reset-pin").then(function (d) {

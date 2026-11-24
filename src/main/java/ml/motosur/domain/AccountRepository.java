@@ -9,4 +9,6 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
     boolean existsByLoginIgnoreCase(String login);
 
     long countByRole(Role role);
+
+    boolean existsByNameIgnoreCaseAndSectionAndActiveTrue(String name, String section);
 }
