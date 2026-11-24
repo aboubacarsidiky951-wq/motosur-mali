@@ -88,11 +88,11 @@ td small{display:block;color:var(--ink-2)}
 #toast span{background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:10px;font-size:.92rem;box-shadow:var(--shadow)}
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 
-/* Barre de navigation en bas : verre liquide bleu ciel */
-.tabs{position:fixed;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));bottom:max(12px,env(safe-area-inset-bottom,0px));z-index:50;max-width:760px;margin-inline:auto;display:flex;flex-wrap:nowrap;gap:4px;padding:6px;border:1px solid rgba(255,255,255,.65);border-radius:26px;background:linear-gradient(135deg,rgba(150,210,250,.72),rgba(70,160,225,.68));-webkit-backdrop-filter:blur(18px) saturate(170%);backdrop-filter:blur(18px) saturate(170%);box-shadow:0 10px 30px rgba(20,80,140,.28),inset 0 1px 0 rgba(255,255,255,.7)}
-.tabs button{flex:1 1 0;min-width:0;margin:0;padding:10px 4px;border:0;border-radius:20px;background:transparent;color:#0B2A4A;font:600 .72rem/1.15 var(--font-body);text-align:center;cursor:pointer;text-shadow:none;box-shadow:none}
-.tabs button:hover{background:rgba(255,255,255,.25)}
-.tabs button[aria-selected="true"]{background:rgba(255,255,255,.7);color:#08213D;border:0;box-shadow:inset 0 0 0 1px rgba(255,255,255,.9),0 2px 8px rgba(20,80,140,.2)}
-.tabs button:focus-visible{outline:3px solid #08213D;outline-offset:-3px}
+/* Barre de navigation en bas : verre liquide bleu marine */
+.tabs{position:fixed;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));bottom:max(12px,env(safe-area-inset-bottom,0px));z-index:50;max-width:760px;margin-inline:auto;display:flex;flex-wrap:nowrap;gap:4px;padding:6px;border:1px solid rgba(255,255,255,.3);border-radius:26px;background:linear-gradient(135deg,#1F5BA8,#0F3566);-webkit-backdrop-filter:blur(18px) saturate(170%);backdrop-filter:blur(18px) saturate(170%);box-shadow:0 10px 26px rgba(15,53,102,.4),inset 0 1px 0 rgba(255,255,255,.35)}
+.tabs button{flex:1 1 0;min-width:0;margin:0;padding:10px 4px;border:0;border-radius:20px;background:transparent;color:#E6EEF9;font:600 .72rem/1.15 var(--font-body);text-align:center;cursor:pointer;text-shadow:none;box-shadow:none}
+.tabs button:hover{background:rgba(255,255,255,.12)}
+.tabs button[aria-selected="true"]{background:rgba(255,255,255,.2);color:#fff;border:0;box-shadow:inset 0 0 0 1px rgba(255,255,255,.5)}
+.tabs button:focus-visible{outline:3px solid #fff;outline-offset:-3px}
 @media (min-width:600px){.tabs button{font-size:.88rem;padding:12px 8px}}
 .wrap.page{padding-bottom:110px}
