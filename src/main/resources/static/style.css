@@ -270,3 +270,5 @@ footer .wrap{padding-block:22px;display:flex;justify-content:space-between;gap:1
 .note-card.seen{border-left-color:var(--line);background:var(--surface-2)}
 .note-card time{font-size:.8rem;color:var(--ink-2)}
 @media (max-width:920px){.head-row .bell{order:2}}
+
+footer .foot-contact{padding-bottom:0;color:var(--ink)}footer .foot-contact p{margin:4px 0 0}footer .foot-contact a{font-weight:700;color:inherit}
