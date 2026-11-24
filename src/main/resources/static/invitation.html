@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Ouvrir mon compte · MotoSûr Mali</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="style.css?v=6">
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap head-row">
+    <span class="brand">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path class="logo-bg" d="M16 3l11 4v8c0 7-4.6 12.2-11 14C9.6 27.2 5 22 5 15V7l11-4z"/><path class="logo-ck" d="M11 16.5l3.4 3.4L21.5 12" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span><b>MotoSûr</b><small>Mali</small></span>
+    </span>
+  </div>
+</header>
+<div class="flag" aria-hidden="true"></div>
+
+<main class="wrap page" id="main">
+  <section id="view-loading"><p class="note">Vérification de votre lien…</p></section>
+
+  <section id="view-bad" hidden>
+    <div class="page-head">
+      <p class="eyebrow">Invitation</p>
+      <h1>Lien non valable</h1>
+      <p class="lead">Ce lien a déjà été utilisé ou il a expiré. Demandez-en un nouveau à la personne qui a créé votre compte.</p>
+    </div>
+  </section>
+
+  <section id="view-form" hidden>
+    <div class="page-head">
+      <p class="eyebrow" id="iv-role"></p>
+      <h1 id="iv-title">Bienvenue</h1>
+      <p class="lead">Choisissez votre mot de passe pour ouvrir votre espace. Ce lien ne sert qu’une seule fois : après, il ne marche plus. Pour revenir plus tard, vous vous connecterez avec votre numéro de téléphone et ce mot de passe.</p>
+    </div>
+    <div class="card" style="max-width:460px">
+      <form id="iv-form" class="form" novalidate>
+        <div class="field"><label for="iv-pw">Mot de passe</label><input id="iv-pw" type="password" autocomplete="new-password" aria-describedby="hint-iv-pw"><p class="hint" id="hint-iv-pw">10 caractères au minimum, avec des lettres. Ne le donnez à personne.</p></div>
+        <div class="field"><label for="iv-pw2">Répétez le mot de passe</label><input id="iv-pw2" type="password" autocomplete="new-password"></div>
+        <p class="err" id="iv-err" role="alert" hidden></p>
+        <div class="actions"><button class="btn btn-primary" type="submit">Ouvrir mon espace</button></div>
+      </form>
+    </div>
+  </section>
+</main>
+<script src="invitation.js?v=1"></script>
+</body>
+</html>

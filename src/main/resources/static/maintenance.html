@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="print.css?v=1">
 <link rel="stylesheet" href="maintenance.css?v=2">
 </head>
 <body>
@@ -72,7 +73,8 @@
 
     <div class="tabs" role="tablist" aria-label="Maintenance">
       <button type="button" role="tab" id="tab-overview" data-tab="overview" aria-selected="true" aria-controls="panel-overview">Vue d’ensemble</button>
-      <button type="button" role="tab" id="tab-accounts" data-tab="accounts" aria-selected="false" tabindex="-1" aria-controls="panel-accounts">Comptes</button>
+      <button type="button" role="tab" id="tab-accounts" data-tab="accounts" aria-selected="false" tabindex="-1" aria-controls="panel-accounts">Comptes et équipes</button>
+      <button type="button" role="tab" id="tab-cash" data-tab="cash" aria-selected="false" tabindex="-1" aria-controls="panel-cash">Caisse du bureau</button>
       <button type="button" role="tab" id="tab-audit" data-tab="audit" aria-selected="false" tabindex="-1" aria-controls="panel-audit">Journal</button>
       <button type="button" role="tab" id="tab-me" data-tab="me" aria-selected="false" tabindex="-1" aria-controls="panel-me">Mon compte</button>
     </div>
@@ -91,20 +93,24 @@
       <div class="card">
         <form id="acc-form" class="stack-sm" novalidate>
           <h2>Créer un compte</h2>
-          <p class="note">Un mot de passe provisoire est généré et affiché une seule fois. La personne devra le changer à sa première connexion.</p>
+          <p class="note">Le site génère un lien personnel, valable 48 heures et utilisable une seule fois. Envoyez-le à la personne par WhatsApp ou copiez-le : elle choisit elle-même son mot de passe.</p>
           <div class="grid2">
             <div class="field"><label for="a-role">Niveau</label>
               <select id="a-role">
                 <option value="CENTRAL">Direction générale (administrateur général)</option>
+                <option value="BUREAU_RESP">Responsable de bureau</option>
+                <option value="BUREAU_AGENT">Agent ou secrétaire de bureau</option>
                 <option value="COMMISSARIAT">Commissariat</option>
                 <option value="AGENT">Agent de terrain</option>
+                <option value="MAINTENANCE">Maintenance (accès complet et caisse)</option>
               </select></div>
-            <div class="field"><label for="a-login" id="a-login-label">Email</label><input id="a-login" type="text" autocomplete="off" autocapitalize="none" spellcheck="false"></div>
-            <div class="field"><label for="a-name">Nom affiché</label><input id="a-name" type="text" autocomplete="off"></div>
+            <div class="field"><label for="a-name">Nom de la personne</label><input id="a-name" type="text" autocomplete="off"></div>
+            <div class="field"><label for="a-phone">Téléphone (WhatsApp)</label><input id="a-phone" type="tel" inputmode="numeric" placeholder="70 00 00 00" autocomplete="off"></div>
             <div class="field" id="a-com-field" hidden><label for="a-com">Commissariat</label><input id="a-com" type="text" autocomplete="off" placeholder="Commissariat du 1er arrondissement"></div>
+            <div class="field" id="a-sec-field" hidden><label for="a-sec">Bureau / section</label><input id="a-sec" type="text" autocomplete="off" placeholder="Bureau central"></div>
           </div>
           <p class="err" id="a-err" role="alert" hidden></p>
-          <div class="actions"><button class="btn btn-primary" type="submit">Créer le compte</button></div>
+          <div class="actions"><button class="btn btn-primary" type="submit">Créer et générer un lien</button></div>
         </form>
       </div>
       <div class="secret" id="secret" hidden role="status"></div>
@@ -114,6 +120,17 @@
           <tbody id="acc-body"></tbody>
         </table>
       </div>
+    </div>
+
+    <div id="panel-cash" data-panel="cash" role="tabpanel" aria-labelledby="tab-cash" class="stack" hidden>
+      <div class="actions"><button type="button" class="btn btn-ghost btn-sm" id="cash-refresh">Actualiser</button><button type="button" class="btn btn-primary btn-sm" id="cash-print">Imprimer le journal</button><span class="note" id="cash-updated"></span></div>
+      <div class="kpis" id="cash-kpis"></div>
+      <div class="grid2">
+        <div class="card stack-sm"><h2>Par agent</h2><div class="table-wrap"><table><thead><tr><th>Agent</th><th>Aujourd’hui</th><th>Motos</th><th>Encaissé</th></tr></thead><tbody id="cash-agents"></tbody></table></div></div>
+        <div class="card stack-sm"><h2>Par bureau / section</h2><div class="table-wrap"><table><thead><tr><th>Bureau</th><th>Aujourd’hui</th><th>Motos</th><th>Encaissé</th></tr></thead><tbody id="cash-sections"></tbody></table></div></div>
+      </div>
+      <div class="card stack-sm"><h2>Journal des paiements</h2><p class="note">Chaque enregistrement ajoute une ligne : nom et téléphone du propriétaire, montant payé, agent qui a enregistré, agent qui a relu et bureau. Page confidentielle, visible seulement par la maintenance.</p>
+        <div class="table-wrap"><table><thead><tr><th>Date</th><th>Reçu</th><th>Plaque</th><th>Propriétaire</th><th>Téléphone</th><th>Montant</th><th>Paiement</th><th>Agent</th><th>Relu par</th><th>Bureau</th></tr></thead><tbody id="cash-journal"></tbody></table></div></div>
     </div>
 
     <div id="panel-audit" data-panel="audit" role="tabpanel" aria-labelledby="tab-audit" class="stack" hidden>
@@ -136,6 +153,7 @@
 
 </main>
 <div id="toast" role="status" aria-live="polite"><span></span></div>
-<script src="maintenance.js?v=2"></script>
+<div id="print-zone" aria-hidden="true"></div>
+<script src="maintenance.js?v=3"></script>
 </body>
 </html>

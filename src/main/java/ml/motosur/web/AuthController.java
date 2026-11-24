@@ -29,15 +29,15 @@ public class AuthController {
 
     static final int MAX_ATTEMPTS = 5;
     static final long LOCK_MINUTES = 15;
-    static final int MIN_PASSWORD = 12;
+    static final int MIN_PASSWORD = 10;
 
     public record LoginRequest(@NotBlank @Size(max = 120) String login, @NotBlank @Size(max = 200) String password) {}
 
     public record PasswordRequest(@NotBlank @Size(max = 200) String current, @NotBlank @Size(max = 200) String next) {}
 
-    public record Me(String login, String name, Role role, String commissariat, boolean mustChangePassword) {
+    public record Me(String login, String name, Role role, String commissariat, String section, boolean mustChangePassword) {
         static Me of(Account a) {
-            return new Me(a.login, a.name, a.role, a.commissariat, a.mustChangePassword);
+            return new Me(a.login, a.name, a.role, a.commissariat, a.section, a.mustChangePassword);
         }
     }
 
@@ -70,7 +70,7 @@ public class AuthController {
         if (!loginLimit.allow(ip)) {
             return ResponseEntity.status(429).body(Map.of("error", "TOO_MANY_REQUESTS"));
         }
-        String login = r.login().trim();
+        String login = normalizeLogin(r.login());
         Account a = accounts.findByLoginIgnoreCase(login).orElse(null);
         Instant now = Instant.now();
 
@@ -119,6 +119,14 @@ public class AuthController {
 
         audit.log(a.login, "LOGIN_OK", null, ip);
         return ResponseEntity.ok(Me.of(a));
+    }
+
+    /** Un numéro de téléphone (avec ou sans +223) est ramené à ses 8 chiffres ; un email reste tel quel. */
+    static String normalizeLogin(String raw) {
+        String t = raw == null ? "" : raw.trim();
+        if (t.contains("@")) return t;
+        String p = ml.motosur.service.AccountService.phone8(t);
+        return p != null ? p : t;
     }
 
     @GetMapping("/me")

@@ -1,10 +1,5 @@
-databases:
-  - name: motosur-db
-    plan: free
-    databaseName: motosur
-    user: motosur
-    ipAllowList: []
-
+# Base de données : PostgreSQL gratuit hébergé chez Neon (https://neon.tech), hors Render.
+# Les valeurs de connexion se saisissent dans Render (Environment), jamais dans le code.
 services:
   - type: web
     name: motosur-mali
@@ -16,15 +11,15 @@ services:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
       - key: DB_HOST
-        fromDatabase: { name: motosur-db, property: host }
+        sync: false
       - key: DB_PORT
-        fromDatabase: { name: motosur-db, property: port }
+        value: "5432"
       - key: DB_NAME
-        fromDatabase: { name: motosur-db, property: database }
+        sync: false
       - key: DB_USER
-        fromDatabase: { name: motosur-db, property: user }
+        sync: false
       - key: DB_PASSWORD
-        fromDatabase: { name: motosur-db, property: password }
+        sync: false
       - key: MAINTENANCE_EMAIL
         value: aboubacar.c130@icloud.com
       # Secret : à saisir par le propriétaire dans Render (12 caractères minimum). Jamais dans le code.

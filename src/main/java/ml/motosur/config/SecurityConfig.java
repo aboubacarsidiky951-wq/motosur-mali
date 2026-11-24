@@ -62,11 +62,14 @@ public class SecurityConfig {
             .addFilterBefore(new AccountGuardFilter(accounts), AuthorizationFilter.class)
             .securityContext(sc -> sc.securityContextRepository(contextRepository))
             .authorizeHttpRequests(a -> a
-                .requestMatchers("/api/auth/login", "/api/auth/csrf", "/api/health", "/api/public/**").permitAll()
+                .requestMatchers("/api/auth/login", "/api/auth/csrf", "/api/health", "/api/public/**",
+                        "/api/invitations/**").permitAll()
                 .requestMatchers("/api/maintenance/**").hasRole("MAINTENANCE")
+                .requestMatchers("/api/bureau/**").hasAnyRole("BUREAU_RESP", "BUREAU_AGENT")
+                .requestMatchers("/api/police/check").hasAnyRole("COMMISSARIAT", "AGENT", "CENTRAL", "BUREAU_RESP", "BUREAU_AGENT")
                 .requestMatchers("/api/police/**").hasAnyRole("COMMISSARIAT", "AGENT", "CENTRAL")
                 .requestMatchers("/api/central/**").hasRole("CENTRAL")
-                .requestMatchers("/api/admin/**").hasAnyRole("CENTRAL", "COMMISSARIAT")
+                .requestMatchers("/api/admin/**").hasAnyRole("CENTRAL", "COMMISSARIAT", "BUREAU_RESP")
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().permitAll())
             .exceptionHandling(e -> e

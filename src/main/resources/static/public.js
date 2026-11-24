@@ -5,7 +5,7 @@
 
   var MSG = {
     TOO_MANY_REQUESTS: "Trop de demandes en peu de temps. Patientez quelques minutes.",
-    TOO_MANY_ATTEMPTS: "Trop d’essais pour cette moto. Réessayez dans une heure.",
+    TOO_MANY_ATTEMPTS: "Trop d’essais : cette moto est bloquée une heure. Si besoin, présentez-vous au bureau avec votre reçu.",
     INVALID_PHONE: "Numéro de téléphone invalide : 8 chiffres attendus.",
     INVALID_COMMUNE: "Commune invalide.",
     INVALID_YEAR: "Année invalide.",
@@ -14,11 +14,10 @@
     PLATE_EXISTS: "Cette plaque est déjà enregistrée.",
     CHASSIS_EXISTS: "Ce numéro de châssis est déjà enregistré.",
     ENGINE_EXISTS: "Ce numéro de moteur est déjà enregistré.",
-    NOT_OWNER: "Moto ou téléphone non reconnus. Vérifiez la plaque et le téléphone enregistré.",
+    NOT_OWNER: "Reçu ou code secret non reconnus. Vérifiez le numéro du reçu et le code à 4 chiffres.",
     ALREADY_STOLEN: "Cette moto est déjà déclarée volée.",
     NOT_STOLEN: "Cette moto n’est pas déclarée volée."
   };
-  var FIELD_OF = { PLATE_EXISTS: "r-plate", CHASSIS_EXISTS: "r-chassis", ENGINE_EXISTS: "r-engine" };
 
   function cookie(n) { var m = document.cookie.match(new RegExp("(?:^|; )" + n + "=([^;]*)")); return m ? decodeURIComponent(m[1]) : ""; }
   function api(method, url, body) {
@@ -84,7 +83,7 @@
   }
 
   /* ---------- routage ---------- */
-  var VIEWS = ["accueil", "enregistrer", "verifier", "signaler", "notifications"];
+  var VIEWS = ["accueil", "verifier", "signaler", "notifications"];
   function route() {
     var v = (location.hash || "#accueil").slice(1); if (VIEWS.indexOf(v) < 0) v = "accueil";
     $$("[data-view]").forEach(function (s) { if (s.tagName === "SECTION") s.hidden = s.getAttribute("data-view") !== v; });
@@ -97,13 +96,12 @@
 
   /* ---------- communes ---------- */
   var COMMUNES = ["Commune I", "Commune II", "Commune III", "Commune IV", "Commune V", "Commune VI"];
-  ["r-commune", "s-commune"].forEach(function (id) {
+  ["s-commune"].forEach(function (id) {
     var s = $("#" + id); if (!s) return;
     s.appendChild(new Option("Choisir", ""));
     COMMUNES.forEach(function (c) { s.appendChild(new Option(c, c)); });
   });
   $("#s-date").max = new Date().toISOString().slice(0, 10);
-  $("#r-year").max = new Date().getFullYear() + 1;
 
   /* ---------- vérification ---------- */
   function resultNode(d, q) {
@@ -142,40 +140,16 @@
   bindCheck("#hero-form", "#hero-q", "#hero-result");
   bindCheck("#pub-form", "#pub-q", "#pub-result");
 
-  /* ---------- enregistrement ---------- */
-  $("#reg-form").addEventListener("submit", function (ev) {
-    ev.preventDefault(); var f = ev.target; clearErrs(f);
-    var req = { "r-owner": "Indiquez le nom et prénom.", "r-phone": "Indiquez le téléphone.", "r-commune": "Choisissez la commune.", "r-plate": "Indiquez la plaque.", "r-chassis": "Indiquez le numéro de châssis.", "r-engine": "Indiquez le numéro de moteur.", "r-brand": "Indiquez la marque.", "r-model": "Indiquez le modèle.", "r-color": "Choisissez la couleur.", "r-year": "Indiquez l’année." };
-    var bad = false;
-    Object.keys(req).forEach(function (id) { if (!val(id)) { setErr(id, req[id]); bad = true; } });
-    if (bad) { var first = $("[aria-invalid]", f); if (first) first.focus(); return; }
-    var body = { ownerName: val("r-owner"), phone: val("r-phone"), commune: val("r-commune"), plate: val("r-plate"), chassis: val("r-chassis"), engine: val("r-engine"), brand: val("r-brand"), model: val("r-model"), color: val("r-color"), year: parseInt(val("r-year"), 10) };
-    busy(f, true);
-    post("/api/public/motos", body).then(function (d) {
-      var done = $("#reg-done"); done.replaceChildren();
-      var s = status("ok", "Moto enregistrée", ["La moto ", el("b", "mono", d.plate), " est maintenant dans le registre."]);
-      done.appendChild(s);
-      done.appendChild(refBlock("Votre référence", d.reference, "cert-ref-text"));
-      done.appendChild(el("p", "note", "Conservez cette référence. Si votre moto est volée, vous pourrez déclarer le vol avec la plaque et votre téléphone."));
-      f.reset(); $("#reg-card").hidden = true; done.hidden = false; done.scrollIntoView({ block: "start" });
-    }).catch(function (e) {
-      var fld = FIELD_OF[e.message];
-      if (fld) { setErr(fld, msg(e)); $("#" + fld).focus(); }
-      else if (e.message === "INVALID_PHONE") { setErr("r-phone", msg(e)); $("#r-phone").focus(); }
-      else toast(msg(e));
-    }).then(function () { busy(f, false); });
-  });
-
   /* ---------- déclarer un vol ---------- */
   var foundQ = "";
   $("#s-find-form").addEventListener("submit", function (ev) {
     ev.preventDefault(); var f = ev.target; setErr("s-q", "");
     var q = $("#s-q").value.trim(); foundQ = "";
     $("#s-found").hidden = true; $("#s-step2").hidden = true;
-    if (q.replace(/[^A-Za-z0-9]/g, "").length < 4) { setErr("s-q", "Saisissez la plaque ou le numéro de châssis."); return; }
+    if (q.replace(/[^A-Za-z0-9]/g, "").length < 8) { setErr("s-q", "Saisissez le numéro de votre reçu (MS-XXXX-XXXX)."); return; }
     busy(f, true);
     api("GET", "/api/public/lookup?q=" + encodeURIComponent(q)).then(function (d) {
-      if (!d.found) { setErr("s-q", "Aucune moto enregistrée avec ce numéro. Enregistrez-la d’abord."); return; }
+      if (!d.found) { setErr("s-q", "Aucune moto avec ce numéro de reçu. Vérifiez-le, ou présentez-vous au bureau."); return; }
       var box = $("#s-found"); box.replaceChildren();
       box.appendChild(el("h2", null, "Moto trouvée"));
       box.appendChild(dl([["Plaque", d.plate, 1], ["Marque et modèle", d.brand + " " + d.model], ["Couleur", d.color], ["Année", d.year]]));
@@ -186,10 +160,10 @@
   $("#s-form").addEventListener("submit", function (ev) {
     ev.preventDefault(); var f = ev.target; clearErrs(f);
     var bad = false;
-    [["s-date", "Indiquez la date du vol."], ["s-commune", "Choisissez la commune."], ["s-place", "Indiquez le lieu précis."], ["s-phone", "Indiquez le téléphone enregistré."]].forEach(function (p) { if (!val(p[0])) { setErr(p[0], p[1]); bad = true; } });
+    [["s-date", "Indiquez la date du vol."], ["s-commune", "Choisissez la commune."], ["s-place", "Indiquez le lieu précis."], ["s-phone", "Indiquez le code secret."]].forEach(function (p) { if (!val(p[0])) { setErr(p[0], p[1]); bad = true; } });
     if (bad || !foundQ) return;
     busy(f, true);
-    post("/api/public/thefts", { q: foundQ, phone: val("s-phone"), date: val("s-date"), commune: val("s-commune"), place: val("s-place"), details: val("s-details") }).then(function (d) {
+    post("/api/public/thefts", { reference: foundQ, pin: val("s-phone"), date: val("s-date"), commune: val("s-commune"), place: val("s-place"), details: val("s-details") }).then(function (d) {
       var done = $("#s-done"); done.replaceChildren();
       done.appendChild(status("stolen", "Alerte enregistrée", ["Le vol de la moto ", el("b", "mono", d.plate), " est déclaré. La police peut désormais la reconnaître."]));
       done.appendChild(refBlock("Référence de l’alerte", d.reference, "al-ref-text"));
@@ -200,10 +174,10 @@
   $("#found-form").addEventListener("submit", function (ev) {
     ev.preventDefault(); var f = ev.target; clearErrs(f); var out = $("#found-done"); out.replaceChildren();
     var bad = false;
-    [["f-q", "Indiquez la plaque ou le châssis."], ["f-phone", "Indiquez le téléphone enregistré."]].forEach(function (p) { if (!val(p[0])) { setErr(p[0], p[1]); bad = true; } });
+    [["f-q", "Indiquez le numéro du reçu."], ["f-phone", "Indiquez le code secret."]].forEach(function (p) { if (!val(p[0])) { setErr(p[0], p[1]); bad = true; } });
     if (bad) return;
     busy(f, true);
-    post("/api/public/recovered", { q: val("f-q"), phone: val("f-phone") }).then(function (d) {
+    post("/api/public/recovered", { reference: val("f-q"), pin: val("f-phone") }).then(function (d) {
       var c = el("div", "cert");
       c.appendChild(status("ok", "Alerte levée", ["La moto ", el("b", "mono", d.plate), " est de nouveau « en règle »."]));
       c.appendChild(refBlock("Référence de confirmation", d.reference, "ret-ref-text"));
@@ -214,8 +188,8 @@
 
 
   /* ---------- cloche de notification ---------- */
-  var KEY = "motosur-owner";
-  function saved() { try { var v = JSON.parse(localStorage.getItem(KEY) || "null"); return v && v.q && v.phone ? v : null; } catch (e) { return null; } }
+  var KEY = "motosur-owner-v2";
+  function saved() { try { var v = JSON.parse(localStorage.getItem(KEY) || "null"); return v && v.reference && v.pin ? v : null; } catch (e) { return null; } }
   function save(v) { try { if (v) localStorage.setItem(KEY, JSON.stringify(v)); else localStorage.removeItem(KEY); } catch (e) {} }
   function setBadge(n) { var b = $("#bell-n"); b.textContent = n > 9 ? "9+" : String(n); b.hidden = !n; $("#bell").setAttribute("aria-label", n ? "Mes notifications : " + n + " nouvelle(s)" : "Mes notifications"); }
   function renderNotes(d, creds) {
@@ -244,10 +218,10 @@
   $("#n-form").addEventListener("submit", function (ev) {
     ev.preventDefault(); var f = ev.target; clearErrs(f);
     var q = val("n-q"), ph = val("n-phone"), bad = false;
-    if (!q) { setErr("n-q", "Indiquez la plaque ou le châssis."); bad = true; }
-    if (!ph) { setErr("n-phone", "Indiquez le téléphone enregistré."); bad = true; }
+    if (!q) { setErr("n-q", "Indiquez le numéro du reçu."); bad = true; }
+    if (!ph) { setErr("n-phone", "Indiquez le code secret."); bad = true; }
     if (bad) return;
-    var creds = { q: q, phone: ph }; busy(f, true);
+    var creds = { reference: q, pin: ph }; busy(f, true);
     loadNotes(creds, false).then(function () { if ($("#n-remember").checked) save(creds); })
       .catch(function (e) { if (e.message === "NOT_OWNER") setErr("n-phone", msg(e)); else toast(msg(e)); }).then(function () { busy(f, false); });
   });

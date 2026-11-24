@@ -8,7 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="print.css?v=1">
 </head>
 <body>
 <header class="site-header">
@@ -28,11 +29,11 @@
     <div class="page-head">
       <p class="eyebrow">Accès réservé</p>
       <h1>Connexion</h1>
-      <p class="lead">Réservé à la Direction de la Police nationale, aux commissariats de Bamako et à leurs agents.</p>
+      <p class="lead">Réservé à la Direction de la Police nationale, aux commissariats de Bamako, aux bureaux d’enregistrement et à leurs agents. Connectez-vous avec votre numéro de téléphone.</p>
     </div>
     <div class="card" style="max-width:460px">
       <form id="login-form" class="form" novalidate>
-        <div class="field"><label for="l-login">Email ou matricule</label><input id="l-login" type="text" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
+        <div class="field"><label for="l-login">Numéro de téléphone</label><input id="l-login" type="text" inputmode="tel" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="70 00 00 00"></div>
         <div class="field"><label for="l-pass">Mot de passe</label><input id="l-pass" type="password" autocomplete="current-password"></div>
         <p class="err" id="l-err" role="alert" hidden></p>
         <div class="actions"><button class="btn btn-primary" type="submit">Se connecter</button></div>
@@ -63,10 +64,78 @@
       <h1 id="app-title">Espace police</h1>
     </div>
     <div class="tabs" role="tablist" aria-label="Espace">
+      <button type="button" role="tab" id="tab-enreg" data-tab="enreg" aria-selected="false" tabindex="-1" aria-controls="panel-enreg" hidden>Enregistrer une moto</button>
       <button type="button" role="tab" id="tab-verif" data-tab="verif" aria-selected="true" aria-controls="panel-verif">Vérification sur place</button>
+      <button type="button" role="tab" id="tab-vol" data-tab="vol" aria-selected="false" tabindex="-1" aria-controls="panel-vol" hidden>Déclarer un vol</button>
       <button type="button" role="tab" id="tab-alertes" data-tab="alertes" aria-selected="false" tabindex="-1" aria-controls="panel-alertes">Alertes vol</button>
       <button type="button" role="tab" id="tab-comptes" data-tab="comptes" aria-selected="false" tabindex="-1" aria-controls="panel-comptes" hidden>Comptes</button>
       <button type="button" role="tab" id="tab-dash" data-tab="dash" aria-selected="false" tabindex="-1" aria-controls="panel-dash" hidden>Tableau de bord</button>
+    </div>
+
+    <div id="panel-enreg" data-panel="enreg" role="tabpanel" aria-labelledby="tab-enreg" hidden>
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div class="card" id="reg-card">
+          <form id="reg-form" class="form" novalidate>
+            <fieldset>
+              <legend>Le propriétaire</legend>
+              <div class="grid2">
+                <div class="field"><label for="r-owner">Nom et prénom</label><input id="r-owner" type="text" autocomplete="off"></div>
+                <div class="field"><label for="r-phone">Téléphone</label><input id="r-phone" type="tel" inputmode="numeric" placeholder="70 00 00 00" autocomplete="off"><p class="hint">8 chiffres, sans +223.</p></div>
+                <div class="field"><label for="r-commune">Commune de résidence</label><select id="r-commune"></select></div>
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend>La moto (numéros relevés sur la moto elle-même)</legend>
+              <div class="grid2">
+                <div class="field"><label for="r-plate">Numéro de plaque</label><input id="r-plate" class="mono" type="text" autocapitalize="characters" autocomplete="off" placeholder="BA 1234 ML"></div>
+                <div class="field"><label for="r-chassis">Numéro de châssis</label><input id="r-chassis" class="mono" type="text" autocapitalize="characters" autocomplete="off"><p class="hint">Gravé sur le cadre, près de la colonne de direction.</p></div>
+                <div class="field"><label for="r-engine">Numéro de moteur</label><input id="r-engine" class="mono" type="text" autocapitalize="characters" autocomplete="off"></div>
+                <div class="field"><label for="r-brand">Marque</label><input id="r-brand" type="text" list="brands" autocomplete="off"><datalist id="brands"><option value="Yamaha"><option value="Honda"><option value="Haojue"><option value="TVS"><option value="Bajaj"><option value="Suzuki"><option value="Sanili"><option value="Apsonic"><option value="Dayun"><option value="Jincheng"></datalist></div>
+                <div class="field"><label for="r-model">Modèle</label><input id="r-model" type="text" autocomplete="off"></div>
+                <div class="field"><label for="r-color">Couleur</label><select id="r-color"><option value="">Choisir</option><option>Noire</option><option>Rouge</option><option>Bleue</option><option>Grise</option><option>Blanche</option><option>Verte</option><option>Jaune</option><option>Autre</option></select></div>
+                <div class="field"><label for="r-year">Année de mise en circulation</label><input id="r-year" type="number" inputmode="numeric" min="1990" placeholder="2022"></div>
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend>Contrôles et paiement</legend>
+              <div class="grid2">
+                <div class="field"><label for="r-checker">Nom de l’agent qui relit les numéros</label><input id="r-checker" type="text" autocomplete="off"><p class="hint">Doit être une autre personne que vous.</p></div>
+                <div class="field"><label for="r-amount">Montant payé (FCFA)</label><input id="r-amount" type="number" inputmode="numeric" min="0" value="2000"></div>
+                <div class="field"><label for="r-mode">Mode de paiement</label><select id="r-mode"><option>Espèces</option><option>Orange Money</option><option>Moov Money</option></select></div>
+              </div>
+              <label class="check"><input id="r-chk1" type="checkbox"> J’ai vu la pièce d’identité et les papiers de la moto.</label>
+              <label class="check"><input id="r-chk2" type="checkbox"> Plaque, châssis et moteur ont été relevés sur la moto et relus par le second agent.</label>
+            </fieldset>
+            <p class="err" id="r-err" role="alert" hidden></p>
+            <div class="actions"><button class="btn btn-primary" type="submit">Enregistrer et éditer le reçu</button></div>
+          </form>
+        </div>
+        <div class="card cert" id="reg-done" hidden aria-live="polite"></div>
+        <div id="code-box" class="callout" hidden role="status"></div>
+        <div>
+          <h2 style="margin-bottom:10px">Mes derniers enregistrements</h2>
+          <div class="table-wrap"><table><thead><tr><th>Reçu</th><th>Plaque</th><th>Propriétaire</th><th>Date</th><th></th></tr></thead><tbody id="mine-body"></tbody></table></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-vol" data-panel="vol" role="tabpanel" aria-labelledby="tab-vol" hidden>
+      <div class="card">
+        <form id="vol-form" class="form" novalidate>
+          <h2>Déclarer un vol pour un propriétaire</h2>
+          <p class="note">Le propriétaire est présent au bureau. Cherchez sa moto avec le numéro du reçu, la plaque, le châssis ou le moteur.</p>
+          <div class="grid2">
+            <div class="field"><label for="v-q">Numéro du reçu, plaque, châssis ou moteur</label><input id="v-q" class="mono" type="text" autocapitalize="characters" autocomplete="off"></div>
+            <div class="field"><label for="v-date">Date du vol</label><input id="v-date" type="date"></div>
+            <div class="field"><label for="v-commune">Commune</label><select id="v-commune"></select></div>
+            <div class="field"><label for="v-place">Lieu précis</label><input id="v-place" type="text" placeholder="Quartier, rue, repère connu"></div>
+          </div>
+          <div class="field"><label for="v-details">Ce qui s’est passé (facultatif)</label><textarea id="v-details" rows="3"></textarea></div>
+          <p class="err" id="v-err" role="alert" hidden></p>
+          <div class="actions"><button class="btn btn-danger" type="submit">Envoyer l’alerte vol</button></div>
+        </form>
+        <div id="vol-done" hidden></div>
+      </div>
     </div>
 
     <div id="panel-verif" data-panel="verif" role="tabpanel" aria-labelledby="tab-verif">
@@ -103,18 +172,18 @@
         <div class="card">
           <form id="acc-form" class="form" novalidate>
             <h2 id="acc-title">Créer un compte</h2>
-            <p class="note">Un mot de passe provisoire est généré et affiché une seule fois. La personne devra le changer à sa première connexion.</p>
+            <p class="note">Le site génère un lien personnel, valable 48 heures et utilisable une seule fois. Envoyez-le à la personne (copie ou WhatsApp) : elle choisit elle-même son mot de passe.</p>
             <div class="grid2">
               <div class="field" id="a-role-field"><label for="a-role">Niveau</label><select id="a-role"><option value="COMMISSARIAT">Commissariat</option><option value="AGENT">Agent de terrain</option></select></div>
-              <div class="field"><label for="a-login" id="a-login-label">Email du commissariat</label><input id="a-login" type="text" autocomplete="off" autocapitalize="none" spellcheck="false"></div>
-              <div class="field"><label for="a-name">Nom affiché</label><input id="a-name" type="text" autocomplete="off"></div>
+              <div class="field"><label for="a-name">Nom de la personne</label><input id="a-name" type="text" autocomplete="off"></div>
+              <div class="field"><label for="a-phone">Téléphone (WhatsApp)</label><input id="a-phone" type="tel" inputmode="numeric" placeholder="70 00 00 00" autocomplete="off"></div>
               <div class="field" id="a-com-field"><label for="a-com">Commissariat</label><input id="a-com" type="text" autocomplete="off" placeholder="Commissariat du 1er arrondissement"></div>
             </div>
             <p class="err" id="a-err" role="alert" hidden></p>
-            <div class="actions"><button class="btn btn-primary" type="submit">Créer le compte</button></div>
+            <div class="actions"><button class="btn btn-primary" type="submit">Créer et générer un lien</button></div>
           </form>
         </div>
-        <div class="callout" id="secret" hidden role="status" style="border-left-color:var(--warn);background:var(--warn-soft)"></div>
+        <div class="callout" id="secret" hidden role="status"></div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Compte</th><th>Niveau</th><th>État</th><th>Dernière connexion</th><th></th></tr></thead>
@@ -153,6 +222,7 @@
 </main>
 <footer><div class="wrap"><span>MotoSûr Mali · espace réservé. Chaque consultation est enregistrée.</span><a href="index.html">Retour au site public</a></div></footer>
 <div id="toast" role="status" aria-live="polite"><span></span></div>
-<script src="espace.js?v=6"></script>
+<div id="print-zone" aria-hidden="true"></div>
+<script src="espace.js?v=7"></script>
 </body>
 </html>

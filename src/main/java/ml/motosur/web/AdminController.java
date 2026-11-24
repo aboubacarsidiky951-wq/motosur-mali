@@ -5,44 +5,37 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import java.security.SecureRandom;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 import ml.motosur.domain.Account;
 import ml.motosur.domain.AccountRepository;
 import ml.motosur.domain.Role;
+import ml.motosur.service.AccountService;
 import ml.motosur.service.AuditService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Gestion des comptes par la hiérarchie :
- * la Direction générale crée les commissariats et les agents ; un commissariat crée les agents de son commissariat.
+ * Comptes créés par la hiérarchie, toujours par lien d'invitation :
+ * la Direction générale crée les commissariats (et des agents), un commissariat crée ses agents,
+ * un responsable de bureau crée les agents de son bureau.
  */
 @RestController
 @RequestMapping("/api/admin")
 public class AdminController {
-
-    private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
-    private static final Pattern MATRICULE = Pattern.compile("^[A-Za-z0-9._-]{3,40}$");
-    private static final String ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-    private static final SecureRandom RANDOM = new SecureRandom();
-
-    public record CreateAccount(@NotBlank @Size(max = 120) String login, @NotBlank @Size(max = 150) String name,
+    public record CreateAccount(@NotBlank @Size(max = 150) String name, @NotBlank @Size(max = 30) String phone,
                                 @NotNull Role role, @Size(max = 150) String commissariat) {}
-
     public record ActiveRequest(boolean active) {}
 
     private final AccountRepository accounts;
-    private final PasswordEncoder encoder;
+    private final AccountService accountService;
     private final AuditService audit;
 
-    public AdminController(AccountRepository accounts, PasswordEncoder encoder, AuditService audit) {
+    public AdminController(AccountRepository accounts, AccountService accountService, AuditService audit) {
         this.accounts = accounts;
-        this.encoder = encoder;
+        this.accountService = accountService;
         this.audit = audit;
     }
 
@@ -51,18 +44,22 @@ public class AdminController {
         return accounts.findByLoginIgnoreCase(login).orElseThrow();
     }
 
-    /** Ce compte est-il sous la responsabilité de l'utilisateur connecté ? */
-    private static boolean manages(Account who, Account target) {
-        if (target.role != Role.COMMISSARIAT && target.role != Role.AGENT) return false;
-        if (who.role == Role.CENTRAL) return true;
-        return who.role == Role.COMMISSARIAT && target.role == Role.AGENT
-                && who.commissariat != null && who.commissariat.equals(target.commissariat);
+    private static boolean same(String a, String b) {
+        return a != null && b != null && a.equalsIgnoreCase(b);
     }
 
-    private static String temporaryPassword() {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < 14; i++) sb.append(ALPHABET.charAt(RANDOM.nextInt(ALPHABET.length())));
-        return sb.toString();
+    /** Ce compte est-il sous la responsabilité de l'utilisateur connecté ? */
+    private static boolean manages(Account who, Account target) {
+        if (who.role == Role.CENTRAL) {
+            return target.role == Role.COMMISSARIAT || target.role == Role.AGENT;
+        }
+        if (who.role == Role.COMMISSARIAT) {
+            return target.role == Role.AGENT && same(who.commissariat, target.commissariat);
+        }
+        if (who.role == Role.BUREAU_RESP) {
+            return target.role == Role.BUREAU_AGENT && same(who.section, target.section);
+        }
+        return false;
     }
 
     @GetMapping("/accounts")
@@ -75,64 +72,50 @@ public class AdminController {
     public ResponseEntity<?> create(@Valid @RequestBody CreateAccount r, HttpServletRequest req) {
         Account who = me();
         Role role = r.role();
-        String commissariat;
+        String commissariat = null;
+        String section = null;
         if (who.role == Role.CENTRAL) {
-            if (role != Role.COMMISSARIAT && role != Role.AGENT) return ResponseEntity.badRequest().body(Map.of("error", "ROLE_NOT_ALLOWED"));
-            commissariat = r.commissariat() == null ? "" : r.commissariat().trim();
+            if (role != Role.COMMISSARIAT && role != Role.AGENT) throw new ApiException(400, "ROLE_NOT_ALLOWED");
+            commissariat = r.commissariat();
         } else if (who.role == Role.COMMISSARIAT) {
-            if (role != Role.AGENT) return ResponseEntity.badRequest().body(Map.of("error", "ROLE_NOT_ALLOWED"));
-            commissariat = who.commissariat == null ? "" : who.commissariat;
+            if (role != Role.AGENT) throw new ApiException(400, "ROLE_NOT_ALLOWED");
+            commissariat = who.commissariat;
+        } else if (who.role == Role.BUREAU_RESP) {
+            if (role != Role.BUREAU_AGENT) throw new ApiException(400, "ROLE_NOT_ALLOWED");
+            section = who.section;
         } else {
-            return ResponseEntity.status(403).body(Map.of("error", "FORBIDDEN"));
+            throw new ApiException(403, "FORBIDDEN");
         }
-        if (commissariat.isEmpty()) return ResponseEntity.badRequest().body(Map.of("error", "COMMISSARIAT_REQUIRED"));
-
-        String login = r.login().trim();
-        if (role == Role.AGENT) {
-            if (!MATRICULE.matcher(login).matches()) return ResponseEntity.badRequest().body(Map.of("error", "INVALID_LOGIN"));
-            login = login.toUpperCase();
-        } else {
-            if (!EMAIL.matcher(login).matches()) return ResponseEntity.badRequest().body(Map.of("error", "INVALID_LOGIN"));
-            login = login.toLowerCase();
-        }
-        if (accounts.existsByLoginIgnoreCase(login)) return ResponseEntity.status(409).body(Map.of("error", "ALREADY_EXISTS"));
-
-        String temp = temporaryPassword();
-        Account a = new Account();
-        a.login = login;
-        a.name = r.name().trim();
-        a.role = role;
-        a.commissariat = commissariat;
-        a.passwordHash = encoder.encode(temp);
-        a.mustChangePassword = true;
-        accounts.save(a);
-        audit.log(who.login, "ACCOUNT_CREATED", a.role + " " + a.login + " (" + commissariat + ")", req.getRemoteAddr());
-        return ResponseEntity.status(201).body(Map.of("account", MaintenanceController.AccountView.of(a), "temporaryPassword", temp));
+        AccountService.Created c = accountService.create(who.login, r.name(), r.phone(), role, commissariat, section,
+                AccountService.baseUrl(req), req.getRemoteAddr());
+        return ResponseEntity.status(201).body(view(c));
     }
 
     @PostMapping("/accounts/{id}/active")
     public ResponseEntity<?> setActive(@PathVariable Long id, @RequestBody ActiveRequest r, HttpServletRequest req) {
         Account who = me();
         Account a = accounts.findById(id).orElse(null);
-        if (a == null || !manages(who, a)) return ResponseEntity.status(404).body(Map.of("error", "NOT_FOUND"));
+        if (a == null || !manages(who, a)) throw new ApiException(404, "NOT_FOUND");
         a.active = r.active();
         accounts.save(a);
         audit.log(who.login, r.active() ? "ACCOUNT_ACTIVATED" : "ACCOUNT_SUSPENDED", a.login, req.getRemoteAddr());
         return ResponseEntity.ok(MaintenanceController.AccountView.of(a));
     }
 
-    @PostMapping("/accounts/{id}/reset-password")
-    public ResponseEntity<?> reset(@PathVariable Long id, HttpServletRequest req) {
+    /** Nouveau lien d'invitation (lien perdu ou expiré, mot de passe oublié). */
+    @PostMapping("/accounts/{id}/invite")
+    public ResponseEntity<?> reinvite(@PathVariable Long id, HttpServletRequest req) {
         Account who = me();
         Account a = accounts.findById(id).orElse(null);
-        if (a == null || !manages(who, a)) return ResponseEntity.status(404).body(Map.of("error", "NOT_FOUND"));
-        String temp = temporaryPassword();
-        a.passwordHash = encoder.encode(temp);
-        a.mustChangePassword = true;
-        a.failedAttempts = 0;
-        a.lockedUntil = null;
-        accounts.save(a);
-        audit.log(who.login, "PASSWORD_RESET", a.login, req.getRemoteAddr());
-        return ResponseEntity.ok(Map.of("account", MaintenanceController.AccountView.of(a), "temporaryPassword", temp));
+        if (a == null || !manages(who, a)) throw new ApiException(404, "NOT_FOUND");
+        return ResponseEntity.ok(view(accountService.reinvite(a, who.login, AccountService.baseUrl(req), req.getRemoteAddr())));
+    }
+
+    static Map<String, Object> view(AccountService.Created c) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("account", MaintenanceController.AccountView.of(c.account()));
+        out.put("inviteUrl", c.inviteUrl());
+        out.put("expiresAt", c.expiresAt());
+        return out;
     }
 }

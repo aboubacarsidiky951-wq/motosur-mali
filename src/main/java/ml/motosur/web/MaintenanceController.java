@@ -6,14 +6,15 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.lang.management.ManagementFactory;
-import java.security.SecureRandom;
 import java.sql.Connection;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 import javax.sql.DataSource;
 import ml.motosur.domain.Account;
 import ml.motosur.domain.AccountRepository;
@@ -23,12 +24,13 @@ import ml.motosur.domain.Moto;
 import ml.motosur.domain.MotoRepository;
 import ml.motosur.domain.Role;
 import ml.motosur.domain.TheftRepository;
+import ml.motosur.service.AccountService;
 import ml.motosur.service.AuditService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 /** Page et API de maintenance : réservées au rôle MAINTENANCE (voir SecurityConfig). */
@@ -36,24 +38,17 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/maintenance")
 public class MaintenanceController {
 
-    private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
-    private static final Pattern MATRICULE = Pattern.compile("^[A-Za-z0-9._-]{3,40}$");
-    private static final String ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-    private static final SecureRandom RANDOM = new SecureRandom();
-
-    public record AccountView(Long id, String login, String name, Role role, String commissariat, boolean active,
-                              boolean mustChangePassword, Instant lockedUntil, Instant lastLoginAt, Instant createdAt) {
+    public record AccountView(Long id, String login, String name, Role role, String commissariat, String section,
+                              String phone, boolean pending, boolean active, Instant lockedUntil, Instant lastLoginAt,
+                              Instant createdAt) {
         static AccountView of(Account a) {
-            return new AccountView(a.id, a.login, a.name, a.role, a.commissariat, a.active,
-                    a.mustChangePassword, a.lockedUntil, a.lastLoginAt, a.createdAt);
+            return new AccountView(a.id, a.login, a.name, a.role, a.commissariat, a.section, a.phone, a.pending,
+                    a.active, a.lockedUntil, a.lastLoginAt, a.createdAt);
         }
     }
-
-    public record CreateAccount(@NotBlank @Size(max = 120) String login, @NotBlank @Size(max = 150) String name,
-                                @NotNull Role role, @Size(max = 150) String commissariat) {}
-
+    public record CreateAccount(@NotBlank @Size(max = 150) String name, @NotBlank @Size(max = 30) String phone,
+                                @NotNull Role role, @Size(max = 150) String commissariat, @Size(max = 80) String section) {}
     public record ActiveRequest(boolean active) {}
-
     public record AuditView(Instant at, String actor, String action, String detail, String ip) {
         static AuditView of(AuditLog l) {
             return new AuditView(l.at, l.actor, l.action, l.detail, l.ip);
@@ -65,19 +60,19 @@ public class MaintenanceController {
     private final AuditService audit;
     private final MotoRepository motos;
     private final TheftRepository thefts;
-    private final PasswordEncoder encoder;
+    private final AccountService accountService;
     private final DataSource dataSource;
     private final String version;
 
     public MaintenanceController(AccountRepository accounts, AuditRepository auditRepo, AuditService audit,
-                                 MotoRepository motos, TheftRepository thefts, PasswordEncoder encoder,
+                                 MotoRepository motos, TheftRepository thefts, AccountService accountService,
                                  DataSource dataSource, @Value("${motosur.version:0.1.0}") String version) {
         this.accounts = accounts;
         this.auditRepo = auditRepo;
         this.audit = audit;
         this.motos = motos;
         this.thefts = thefts;
-        this.encoder = encoder;
+        this.accountService = accountService;
         this.dataSource = dataSource;
         this.version = version;
     }
@@ -86,7 +81,6 @@ public class MaintenanceController {
     public Map<String, Object> overview() {
         Runtime rt = Runtime.getRuntime();
         Instant started = Instant.ofEpochMilli(ManagementFactory.getRuntimeMXBean().getStartTime());
-
         Map<String, Object> app = new LinkedHashMap<>();
         app.put("version", version);
         app.put("java", System.getProperty("java.version"));
@@ -94,7 +88,6 @@ public class MaintenanceController {
         app.put("uptimeSeconds", Duration.between(started, Instant.now()).getSeconds());
         app.put("memoryUsedMb", (rt.totalMemory() - rt.freeMemory()) / 1_048_576);
         app.put("memoryMaxMb", rt.maxMemory() / 1_048_576);
-
         Map<String, Object> db = new LinkedHashMap<>();
         try (Connection c = dataSource.getConnection()) {
             db.put("ok", c.isValid(2));
@@ -103,24 +96,20 @@ public class MaintenanceController {
             db.put("ok", false);
             db.put("product", "inaccessible");
         }
-
         Map<String, Long> roles = new LinkedHashMap<>();
         for (Role r : Role.values()) {
             roles.put(r.name(), accounts.countByRole(r));
         }
-
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("accounts", roles);
         data.put("motos", motos.count());
         data.put("thefts", thefts.count());
         data.put("motosStolen", motos.countByStatus(Moto.Status.STOLEN));
         data.put("motosRecovered", motos.countByStatus(Moto.Status.RECOVERED));
-
         Instant since = Instant.now().minus(Duration.ofHours(24));
         Map<String, Object> security = new LinkedHashMap<>();
         security.put("failedLogins24h", auditRepo.countByActionAndAtAfter("LOGIN_FAILED", since));
         security.put("lockouts24h", auditRepo.countByActionAndAtAfter("ACCOUNT_LOCKED", since));
-
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("app", app);
         out.put("database", db);
@@ -134,42 +123,12 @@ public class MaintenanceController {
         return accounts.findAll().stream().map(AccountView::of).toList();
     }
 
+    /** Crée un compte et renvoie son lien d'invitation (valable 48 h, utilisable une seule fois). */
     @PostMapping("/accounts")
     public ResponseEntity<?> createAccount(@Valid @RequestBody CreateAccount r, HttpServletRequest req) {
-        if (r.role() == Role.MAINTENANCE) {
-            return ResponseEntity.badRequest().body(Map.of("error", "ROLE_NOT_ALLOWED"));
-        }
-        String login = r.login().trim();
-        boolean needsCommissariat = r.role() == Role.COMMISSARIAT || r.role() == Role.AGENT;
-        if (r.role() == Role.AGENT) {
-            if (!MATRICULE.matcher(login).matches()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "INVALID_LOGIN"));
-            }
-            login = login.toUpperCase();
-        } else {
-            if (!EMAIL.matcher(login).matches()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "INVALID_LOGIN"));
-            }
-            login = login.toLowerCase();
-        }
-        String commissariat = r.commissariat() == null ? "" : r.commissariat().trim();
-        if (needsCommissariat && commissariat.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "COMMISSARIAT_REQUIRED"));
-        }
-        if (accounts.existsByLoginIgnoreCase(login)) {
-            return ResponseEntity.status(409).body(Map.of("error", "ALREADY_EXISTS"));
-        }
-        String temp = temporaryPassword();
-        Account a = new Account();
-        a.login = login;
-        a.name = r.name().trim();
-        a.role = r.role();
-        a.commissariat = needsCommissariat ? commissariat : null;
-        a.passwordHash = encoder.encode(temp);
-        a.mustChangePassword = true;
-        accounts.save(a);
-        audit.log(actor(), "ACCOUNT_CREATED", a.role + " " + a.login, req.getRemoteAddr());
-        return ResponseEntity.status(201).body(Map.of("account", AccountView.of(a), "temporaryPassword", temp));
+        AccountService.Created c = accountService.create(actor(), r.name(), r.phone(), r.role(), r.commissariat(),
+                r.section(), AccountService.baseUrl(req), req.getRemoteAddr());
+        return ResponseEntity.status(201).body(AdminController.view(c));
     }
 
     @PostMapping("/accounts/{id}/active")
@@ -187,23 +146,92 @@ public class MaintenanceController {
         return ResponseEntity.ok(AccountView.of(a));
     }
 
-    @PostMapping("/accounts/{id}/reset-password")
-    public ResponseEntity<?> resetPassword(@PathVariable Long id, HttpServletRequest req) {
+    /** Nouveau lien d'invitation : l'ancien mot de passe et l'ancien lien cessent de fonctionner. */
+    @PostMapping("/accounts/{id}/invite")
+    public ResponseEntity<?> reinvite(@PathVariable Long id, HttpServletRequest req) {
         Account a = accounts.findById(id).orElse(null);
         if (a == null) {
             return ResponseEntity.status(404).body(Map.of("error", "NOT_FOUND"));
         }
-        if (a.role == Role.MAINTENANCE) {
+        if (a.login.equalsIgnoreCase(actor())) {
             return ResponseEntity.badRequest().body(Map.of("error", "ROLE_NOT_ALLOWED"));
         }
-        String temp = temporaryPassword();
-        a.passwordHash = encoder.encode(temp);
-        a.mustChangePassword = true;
-        a.failedAttempts = 0;
-        a.lockedUntil = null;
-        accounts.save(a);
-        audit.log(actor(), "PASSWORD_RESET", a.login, req.getRemoteAddr());
-        return ResponseEntity.ok(Map.of("account", AccountView.of(a), "temporaryPassword", temp));
+        return ResponseEntity.ok(AdminController.view(
+                accountService.reinvite(a, actor(), AccountService.baseUrl(req), req.getRemoteAddr())));
+    }
+
+    /**
+     * Caisse du bureau (confidentielle : réservée à la maintenance) : totaux, détail par agent et par bureau,
+     * et journal des paiements (nom, téléphone et montant payé par chaque propriétaire).
+     */
+    @GetMapping("/cash")
+    @Transactional(readOnly = true)
+    public Map<String, Object> cash(@RequestParam(defaultValue = "300") int limit) {
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        List<Moto> paid = motos.findByPaidAmountNotNullOrderByRegisteredAtDesc();
+        long totalAll = 0;
+        long totalToday = 0;
+        long countToday = 0;
+        Map<String, long[]> byAgent = new LinkedHashMap<>();
+        Map<String, long[]> bySection = new LinkedHashMap<>();
+        for (Moto m : paid) {
+            long amount = m.paidAmount == null ? 0 : m.paidAmount;
+            boolean isToday = m.registeredAt.atZone(ZoneOffset.UTC).toLocalDate().equals(today);
+            totalAll += amount;
+            if (isToday) {
+                totalToday += amount;
+                countToday++;
+            }
+            long[] a = byAgent.computeIfAbsent(m.registeredByName == null ? "—" : m.registeredByName, k -> new long[3]);
+            long[] b = bySection.computeIfAbsent(m.section == null ? "—" : m.section, k -> new long[3]);
+            a[0]++;
+            a[1] += amount;
+            b[0]++;
+            b[1] += amount;
+            if (isToday) {
+                a[2]++;
+                b[2]++;
+            }
+        }
+        List<Map<String, Object>> agents = new ArrayList<>();
+        byAgent.forEach((k, v) -> agents.add(group(k, v)));
+        List<Map<String, Object>> sections = new ArrayList<>();
+        bySection.forEach((k, v) -> sections.add(group(k, v)));
+        int size = Math.max(1, Math.min(limit, 1000));
+        List<Map<String, Object>> journal = new ArrayList<>();
+        for (Moto m : paid.stream().limit(size).toList()) {
+            Map<String, Object> o = new LinkedHashMap<>();
+            o.put("at", m.registeredAt);
+            o.put("receipt", m.receiptNo);
+            o.put("reference", m.reference);
+            o.put("plate", m.plate);
+            o.put("ownerName", m.ownerName);
+            o.put("ownerPhone", m.ownerPhone);
+            o.put("amount", m.paidAmount);
+            o.put("mode", m.paymentMode);
+            o.put("agent", m.registeredByName);
+            o.put("checkedBy", m.checkedBy);
+            o.put("section", m.section);
+            journal.add(o);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("todayCount", countToday);
+        out.put("todayTotal", totalToday);
+        out.put("allCount", paid.size());
+        out.put("allTotal", totalAll);
+        out.put("byAgent", agents);
+        out.put("bySection", sections);
+        out.put("journal", journal);
+        return out;
+    }
+
+    private static Map<String, Object> group(String name, long[] v) {
+        Map<String, Object> o = new LinkedHashMap<>();
+        o.put("name", name);
+        o.put("count", v[0]);
+        o.put("total", v[1]);
+        o.put("today", v[2]);
+        return o;
     }
 
     @GetMapping("/audit")
@@ -214,13 +242,5 @@ public class MaintenanceController {
 
     private static String actor() {
         return SecurityContextHolder.getContext().getAuthentication().getName();
-    }
-
-    private static String temporaryPassword() {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < 14; i++) {
-            sb.append(ALPHABET.charAt(RANDOM.nextInt(ALPHABET.length())));
-        }
-        return sb.toString();
     }
 }

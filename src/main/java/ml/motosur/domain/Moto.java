@@ -53,4 +53,28 @@ public class Moto {
 
     @Column(nullable = false)
     public Instant registeredAt = Instant.now();
+
+    /** Code secret à 4 chiffres remis au propriétaire sur son reçu (stocké chiffré, jamais en clair). */
+    @Column(length = 80)
+    public String pinHash;
+
+    @Column(nullable = false, columnDefinition = "integer default 0")
+    public int pinFails;
+
+    public Instant pinLockedUntil;
+
+    /** Enregistrement au bureau : qui, où, combien. */
+    @Column(length = 80)
+    public String section;
+    @Column(length = 120)
+    public String registeredByLogin;
+    @Column(length = 150)
+    public String registeredByName;
+    @Column(length = 150)
+    public String checkedBy;
+    public Integer paidAmount;
+    @Column(length = 20)
+    public String paymentMode;
+    @Column(length = 30)
+    public String receiptNo;
 }

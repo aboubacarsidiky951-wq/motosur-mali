@@ -15,4 +15,9 @@ public class ApiExceptionHandler {
     ResponseEntity<Map<String, String>> invalid() {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "INVALID_REQUEST"));
     }
+
+    @ExceptionHandler(ApiException.class)
+    ResponseEntity<Map<String, String>> api(ApiException e) {
+        return ResponseEntity.status(e.status).body(Map.of("error", e.code));
+    }
 }

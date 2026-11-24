@@ -28,6 +28,18 @@ public class Account {
     @Column(length = 150)
     public String commissariat;
 
+    /** Téléphone (8 chiffres) : sert d'identifiant de connexion et pour envoyer le lien d'invitation. */
+    @Column(length = 20)
+    public String phone;
+
+    /** Bureau ou section, pour les comptes du bureau d'enregistrement. */
+    @Column(length = 80)
+    public String section;
+
+    /** Vrai tant que la personne n'a pas ouvert son lien d'invitation. */
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    public boolean pending;
+
     @Column(nullable = false)
     public boolean active = true;
 

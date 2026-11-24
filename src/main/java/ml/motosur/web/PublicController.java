@@ -17,6 +17,7 @@ import ml.motosur.domain.Theft;
 import ml.motosur.domain.TheftRepository;
 import ml.motosur.service.AuditService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,35 +29,24 @@ public class PublicController {
     static final List<String> COMMUNES = List.of("Commune I", "Commune II", "Commune III", "Commune IV", "Commune V", "Commune VI");
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    public record RegisterRequest(
-            @NotBlank @Size(max = 150) String ownerName,
-            @NotBlank @Size(max = 30) String phone,
-            @NotBlank @Size(max = 40) String commune,
-            @NotBlank @Size(max = 30) String plate,
-            @NotBlank @Size(max = 40) String chassis,
-            @NotBlank @Size(max = 40) String engine,
-            @NotBlank @Size(max = 60) String brand,
-            @NotBlank @Size(max = 60) String model,
-            @NotBlank @Size(max = 30) String color,
-            @NotNull @Min(1990) @Max(2100) Integer year) {}
-
     public record TheftRequest(
-            @NotBlank @Size(max = 60) String q,
-            @NotBlank @Size(max = 30) String phone,
+            @NotBlank @Size(max = 30) String reference,
+            @NotBlank @Size(max = 10) String pin,
             @NotNull LocalDate date,
             @NotBlank @Size(max = 40) String commune,
             @NotBlank @Size(max = 200) String place,
             @Size(max = 1000) String details) {}
 
-    public record RecoveredRequest(@NotBlank @Size(max = 60) String q, @NotBlank @Size(max = 30) String phone) {}
+    public record RecoveredRequest(@NotBlank @Size(max = 30) String reference, @NotBlank @Size(max = 10) String pin) {}
 
     private final MotoRepository motos;
     private final TheftRepository thefts;
     private final NotificationRepository notifications;
     private final AuditService audit;
+    private final PasswordEncoder encoder;
     private final RateLimiter notifLimit = new RateLimiter(30, 600_000);
-    /** Au plus 5 téléphones faux par moto et par heure, quelle que soit l'adresse IP. */
-    private final RateLimiter ownerFailLimit = new RateLimiter(5, 3_600_000);
+    /** Au plus 30 codes faux par adresse IP et par heure (en plus du verrouillage par moto). */
+    private final RateLimiter ipFailLimit = new RateLimiter(30, 3_600_000);
 
     static final class TooManyAttempts extends RuntimeException {}
 
@@ -68,7 +58,8 @@ public class PublicController {
     private final RateLimiter writeLimit = new RateLimiter(10, 600_000);
 
     public PublicController(MotoRepository motos, TheftRepository thefts, NotificationRepository notifications,
-                            AuditService audit) {
+                            AuditService audit, PasswordEncoder encoder) {
+        this.encoder = encoder;
         this.notifications = notifications;
         this.motos = motos;
         this.thefts = thefts;
@@ -77,6 +68,13 @@ public class PublicController {
 
     static String norm(String s) {
         return s == null ? "" : s.toUpperCase().replaceAll("[^A-Z0-9]", "");
+    }
+
+    /** Numéro de reçu saisi par le propriétaire (avec ou sans tirets) ramené à la forme MS-XXXX-XXXX. */
+    static String formatRef(String in) {
+        String n = norm(in);
+        if (n.length() == 10 && n.startsWith("MS")) return "MS-" + n.substring(2, 6) + "-" + n.substring(6);
+        return n;
     }
 
     /** 8 chiffres maliens, avec ou sans indicatif ; null si invalide. */
@@ -102,38 +100,6 @@ public class PublicController {
     @GetMapping("/communes")
     public List<String> communes() {
         return COMMUNES;
-    }
-
-    @PostMapping("/motos")
-    @Transactional
-    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest r, HttpServletRequest req) {
-        if (!writeLimit.allow(req.getRemoteAddr())) return err(429, "TOO_MANY_REQUESTS");
-        String ph = phone(r.phone());
-        if (ph == null) return err(400, "INVALID_PHONE");
-        if (!COMMUNES.contains(r.commune())) return err(400, "INVALID_COMMUNE");
-        int maxYear = LocalDate.now().getYear() + 1;
-        if (r.year() > maxYear) return err(400, "INVALID_YEAR");
-        String plate = norm(r.plate()), chassis = norm(r.chassis()), engine = norm(r.engine());
-        if (plate.length() < 4 || chassis.length() < 5 || engine.length() < 4) return err(400, "INVALID_NUMBERS");
-        if (motos.existsByPlate(plate)) return err(409, "PLATE_EXISTS");
-        if (motos.existsByChassis(chassis)) return err(409, "CHASSIS_EXISTS");
-        if (motos.existsByEngine(engine)) return err(409, "ENGINE_EXISTS");
-
-        Moto m = new Moto();
-        m.reference = ref("MS");
-        m.plate = plate;
-        m.chassis = chassis;
-        m.engine = engine;
-        m.brand = r.brand().trim();
-        m.model = r.model().trim();
-        m.color = r.color().trim();
-        m.year = r.year();
-        m.ownerName = r.ownerName().trim();
-        m.ownerPhone = ph;
-        m.commune = r.commune();
-        motos.save(m);
-        audit.log("public", "MOTO_REGISTERED", m.reference + " " + m.plate, req.getRemoteAddr());
-        return ResponseEntity.status(201).body(Map.of("reference", m.reference, "plate", m.plate));
     }
 
     @GetMapping("/check")
@@ -170,25 +136,57 @@ public class PublicController {
         return ResponseEntity.ok(out);
     }
 
-    /** Trouve la moto d'un propriétaire : même réponse pour « inconnue » et « mauvais téléphone ». */
-    private Moto owned(String q, String phoneIn) {
-        String ph = phone(phoneIn);
-        String n = norm(q);
-        if (ph == null || n.length() < 4) return null;
-        Moto m = motos.findFirstByPlateOrChassisOrEngine(n, n, n).orElse(null);
-        if (m == null) return null;
-        if (ownerFailLimit.blocked(m.plate)) throw new TooManyAttempts();
-        if (!m.ownerPhone.equals(ph)) {
-            ownerFailLimit.hit(m.plate);
+    /**
+     * Trouve la moto d'un propriétaire à partir du numéro de son reçu et de son code secret.
+     * Même réponse pour « reçu inconnu » et « mauvais code » ; la moto est bloquée une heure après 5 codes faux.
+     */
+    private Moto owned(String refIn, String pinIn, String ip) {
+        if (ipFailLimit.blocked(ip)) throw new TooManyAttempts();
+        String pin = pinIn == null ? "" : pinIn.trim();
+        Moto m = motos.findByReference(formatRef(refIn)).orElse(null);
+        if (m == null || m.pinHash == null || !pin.matches("\\d{4}")) {
+            ipFailLimit.hit(ip);
             return null;
+        }
+        Instant now = Instant.now();
+        if (m.pinLockedUntil != null && m.pinLockedUntil.isAfter(now)) throw new TooManyAttempts();
+        if (!encoder.matches(pin, m.pinHash)) {
+            ipFailLimit.hit(ip);
+            m.pinFails++;
+            if (m.pinFails >= 5) {
+                m.pinLockedUntil = now.plusSeconds(3600);
+                m.pinFails = 0;
+                audit.log("système", "PIN_LOCKED", "Moto " + m.plate + " bloquée 1 h après 5 codes faux", ip);
+            }
+            motos.save(m);
+            return null;
+        }
+        if (m.pinFails != 0 || m.pinLockedUntil != null) {
+            m.pinFails = 0;
+            m.pinLockedUntil = null;
+            motos.save(m);
         }
         return m;
     }
 
     @GetMapping("/lookup")
     public ResponseEntity<?> lookup(@RequestParam String q, HttpServletRequest req) {
-        // Étape 1 de « Déclarer un vol » : confirme l'existence de la moto, sans données personnelles.
-        return check(q, req);
+        // Étape 1 de « Déclarer un vol » : le propriétaire saisit le numéro de son reçu ; aucune donnée personnelle.
+        if (!checkLimit.allow(req.getRemoteAddr())) return err(429, "TOO_MANY_REQUESTS");
+        Map<String, Object> out = new LinkedHashMap<>();
+        Moto m = motos.findByReference(formatRef(q)).orElse(null);
+        if (m == null) {
+            out.put("found", false);
+            return ResponseEntity.ok(out);
+        }
+        out.put("found", true);
+        out.put("status", m.status.name());
+        out.put("plate", m.plate);
+        out.put("brand", m.brand);
+        out.put("model", m.model);
+        out.put("color", m.color);
+        out.put("year", m.year);
+        return ResponseEntity.ok(out);
     }
 
     @PostMapping("/thefts")
@@ -199,9 +197,9 @@ public class PublicController {
         if (r.date().isAfter(LocalDate.now()) || r.date().isBefore(LocalDate.now().minusYears(1))) {
             return err(400, "INVALID_DATE");
         }
-        Moto m = owned(r.q(), r.phone());
+        Moto m = owned(r.reference(), r.pin(), req.getRemoteAddr());
         if (m == null) {
-            audit.log("public", "THEFT_REFUSED", "Moto ou téléphone non reconnus", req.getRemoteAddr());
+            audit.log("public", "THEFT_REFUSED", "Reçu ou code non reconnus", req.getRemoteAddr());
             return err(403, "NOT_OWNER");
         }
         if (m.status == Moto.Status.STOLEN) return err(409, "ALREADY_STOLEN");
@@ -223,9 +221,9 @@ public class PublicController {
     @Transactional
     public ResponseEntity<?> recovered(@Valid @RequestBody RecoveredRequest r, HttpServletRequest req) {
         if (!writeLimit.allow(req.getRemoteAddr())) return err(429, "TOO_MANY_REQUESTS");
-        Moto m = owned(r.q(), r.phone());
+        Moto m = owned(r.reference(), r.pin(), req.getRemoteAddr());
         if (m == null) {
-            audit.log("public", "RECOVERY_REFUSED", "Moto ou téléphone non reconnus", req.getRemoteAddr());
+            audit.log("public", "RECOVERY_REFUSED", "Reçu ou code non reconnus", req.getRemoteAddr());
             return err(403, "NOT_OWNER");
         }
         if (m.status != Moto.Status.STOLEN) return err(409, "NOT_STOLEN");
@@ -239,12 +237,12 @@ public class PublicController {
         return ResponseEntity.ok(Map.of("reference", t.recoveredReference, "plate", m.plate));
     }
 
-    /** Cloche de notification : le propriétaire (plaque + téléphone) lit les messages concernant sa moto. */
+    /** Cloche de notification : le propriétaire (numéro du reçu + code secret) lit les messages concernant sa moto. */
     @PostMapping("/notifications")
     @Transactional
     public ResponseEntity<?> myNotifications(@Valid @RequestBody RecoveredRequest r, HttpServletRequest req) {
         if (!notifLimit.allow(req.getRemoteAddr())) return err(429, "TOO_MANY_REQUESTS");
-        Moto m = owned(r.q(), r.phone());
+        Moto m = owned(r.reference(), r.pin(), req.getRemoteAddr());
         if (m == null) return err(403, "NOT_OWNER");
         List<Map<String, Object>> items = new java.util.ArrayList<>();
         long unread = 0;
@@ -268,7 +266,7 @@ public class PublicController {
     @Transactional
     public ResponseEntity<?> markRead(@Valid @RequestBody RecoveredRequest r, HttpServletRequest req) {
         if (!notifLimit.allow(req.getRemoteAddr())) return err(429, "TOO_MANY_REQUESTS");
-        Moto m = owned(r.q(), r.phone());
+        Moto m = owned(r.reference(), r.pin(), req.getRemoteAddr());
         if (m == null) return err(403, "NOT_OWNER");
         for (Notification n : notifications.findTop20ByMotoOrderByCreatedAtDesc(m)) {
             n.seen = true;

@@ -8,6 +8,10 @@ public interface MotoRepository extends JpaRepository<Moto, Long> {
 
     Optional<Moto> findFirstByPlateOrChassisOrEngine(String plate, String chassis, String engine);
 
+    Optional<Moto> findByReference(String reference);
+    java.util.List<Moto> findByPaidAmountNotNullOrderByRegisteredAtDesc();
+    java.util.List<Moto> findTop30ByRegisteredByLoginOrderByRegisteredAtDesc(String login);
+    boolean existsByReference(String reference);
     boolean existsByPlate(String plate);
 
     boolean existsByChassis(String chassis);

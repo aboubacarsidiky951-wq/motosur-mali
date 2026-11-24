@@ -6,14 +6,16 @@
     LOCKED: "Compte verrouillé après trop d’essais. Réessayez dans 15 minutes.",
     SUSPENDED: "Ce compte est suspendu.",
     WRONG_CURRENT_PASSWORD: "Le mot de passe actuel est incorrect.",
-    WEAK_PASSWORD: "Nouveau mot de passe refusé : 12 caractères minimum, différent de l’ancien.",
-    INVALID_LOGIN: "Identifiant invalide (email pour une direction ou un commissariat, matricule pour un agent).",
+    WEAK_PASSWORD: "Nouveau mot de passe refusé : 10 caractères minimum, avec des lettres.",
     COMMISSARIAT_REQUIRED: "Indiquez le commissariat.",
-    ALREADY_EXISTS: "Ce compte existe déjà.",
+    SECTION_REQUIRED: "Indiquez le bureau ou la section.",
+    ALREADY_EXISTS: "Un compte existe déjà avec ce numéro de téléphone.",
+    INVALID_PHONE: "Numéro de téléphone invalide : 8 chiffres attendus.",
+    INVALID_NAME: "Indiquez le nom de la personne.",
     ROLE_NOT_ALLOWED: "Action non autorisée sur ce niveau.",
     NOT_FOUND: "Compte introuvable."
   };
-  var ROLES = { MAINTENANCE: "Maintenance", CENTRAL: "Direction générale", COMMISSARIAT: "Commissariat", AGENT: "Agent" };
+  var ROLES = { MAINTENANCE: "Maintenance", CENTRAL: "Direction générale", COMMISSARIAT: "Commissariat", AGENT: "Agent", BUREAU_RESP: "Responsable de bureau", BUREAU_AGENT: "Agent de bureau" };
   var me = null;
   var toastTimer;
 
@@ -84,6 +86,7 @@
     if (name === "overview") loadOverview();
     if (name === "accounts") loadAccounts();
     if (name === "audit") loadAudit();
+    if (name === "cash") loadCash();
     if (name === "me") $("me-info").textContent = me.name + " · " + me.login;
   }
   document.querySelectorAll("[data-tab]").forEach(function (b) {
@@ -124,7 +127,7 @@
   $("pw-form").addEventListener("submit", function (ev) {
     ev.preventDefault(); showErr("p-err", "");
     var f = ev.target, cur = $("p-cur").value, n1 = $("p-new").value, n2 = $("p-new2").value;
-    if (n1.length < 12) { showErr("p-err", "12 caractères minimum."); return; }
+    if (n1.length < 10) { showErr("p-err", "10 caractères minimum."); return; }
     if (n1 !== n2) { showErr("p-err", "Les deux mots de passe ne sont pas identiques."); return; }
     busy(f, true);
     api("POST", "/api/auth/password", { current: cur, next: n1 }).then(function (m) {
@@ -171,24 +174,28 @@
   /* ---------- Comptes ---------- */
   function syncRole() {
     var r = $("a-role").value;
-    $("a-com-field").hidden = r === "CENTRAL";
-    $("a-login-label").textContent = r === "AGENT" ? "Matricule" : "Email";
+    $("a-com-field").hidden = !(r === "COMMISSARIAT" || r === "AGENT");
+    $("a-sec-field").hidden = !(r === "BUREAU_RESP" || r === "BUREAU_AGENT");
   }
   $("a-role").addEventListener("change", syncRole); syncRole();
 
-  function secretBox(title, login, pw) {
+  function phoneFmt(p) { return p && p.length === 8 ? "+223 " + p.replace(/(\d\d)(?=\d)/g, "$1 ") : (p || ""); }
+  function linkBox(title, name, phoneNum, url, expires) {
     var b = $("secret"); b.replaceChildren();
-    b.appendChild(el("b", null, title + " : " + login));
-    b.appendChild(el("p", "note", "Mot de passe provisoire, affiché une seule fois. Transmettez-le de façon sûre ; il devra être changé à la première connexion."));
-    b.appendChild(el("div", "pw", pw));
+    b.appendChild(el("b", null, title + " : " + name));
+    b.appendChild(el("p", "note", "Lien personnel, valable jusqu’au " + fmt(expires) + " et utilisable une seule fois. Envoyez-le uniquement à cette personne."));
+    var u = el("div", "pw", url); u.style.cssText = "font-size:.85rem;overflow-wrap:anywhere;user-select:all"; b.appendChild(u);
     var row = el("div", "actions");
-    var c = el("button", "btn btn-ghost btn-sm", "Copier"); c.type = "button";
+    var c = el("button", "btn btn-primary btn-sm", "Copier le lien"); c.type = "button";
     c.addEventListener("click", function () {
-      if (navigator.clipboard) navigator.clipboard.writeText(pw).then(function () { toast("Copié."); }, function () { toast("Sélectionnez le texte pour le copier."); });
+      if (navigator.clipboard) navigator.clipboard.writeText(url).then(function () { toast("Lien copié."); }, function () { toast("Sélectionnez le lien pour le copier."); });
+      else toast("Sélectionnez le lien pour le copier.");
     });
+    var w = el("a", "btn btn-secondary btn-sm", "Envoyer par WhatsApp"); w.target = "_blank"; w.rel = "noopener";
+    w.href = "https://wa.me/223" + phoneNum + "?text=" + encodeURIComponent("Bonjour " + name + ", voici votre lien personnel MotoSûr Mali pour ouvrir votre compte (valable 48 h, utilisable une seule fois) : " + url);
     var x = el("button", "btn btn-ghost btn-sm", "Masquer"); x.type = "button";
     x.addEventListener("click", function () { b.hidden = true; b.replaceChildren(); });
-    row.appendChild(c); row.appendChild(x); b.appendChild(row); b.hidden = false; b.scrollIntoView({ block: "nearest" });
+    row.appendChild(c); row.appendChild(w); row.appendChild(x); b.appendChild(row); b.hidden = false; b.scrollIntoView({ block: "nearest" });
   }
 
   function loadAccounts() {
@@ -196,13 +203,13 @@
       var body = $("acc-body"); body.replaceChildren();
       list.forEach(function (a) {
         var tr = el("tr");
-        var c1 = el("td"); c1.appendChild(el("b", null, a.name)); c1.appendChild(el("small", "mono", a.login));
+        var c1 = el("td"); c1.appendChild(el("b", null, a.name)); c1.appendChild(el("small", "mono", a.role === "MAINTENANCE" ? a.login : phoneFmt(a.phone || a.login)));
+        if (a.section) c1.appendChild(el("small", null, a.section));
         if (a.commissariat) c1.appendChild(el("small", null, a.commissariat));
         var c2 = el("td", null, ROLES[a.role] || a.role);
         var c3 = el("td");
         var locked = a.lockedUntil && new Date(a.lockedUntil) > new Date();
-        c3.appendChild(el("span", "pill " + (!a.active ? "pill-bad" : locked ? "pill-warn" : "pill-ok"), !a.active ? "Suspendu" : locked ? "Verrouillé" : "Actif"));
-        if (a.mustChangePassword) c3.appendChild(el("small", null, "Mot de passe provisoire"));
+        c3.appendChild(el("span", "pill " + (!a.active ? "pill-bad" : (a.pending || locked) ? "pill-warn" : "pill-ok"), !a.active ? "Suspendu" : a.pending ? "En attente du lien" : locked ? "Verrouillé" : "Actif"));
         var c4 = el("td", null, fmt(a.lastLoginAt));
         var c5 = el("td"), act = el("div", "row-actions");
         if (a.role !== "MAINTENANCE") {
@@ -210,10 +217,10 @@
           t.addEventListener("click", function () {
             api("POST", "/api/maintenance/accounts/" + a.id + "/active", { active: !a.active }).then(function () { toast(a.active ? "Compte suspendu." : "Compte réactivé."); loadAccounts(); }).catch(handleAuthLoss);
           });
-          var r = el("button", "btn btn-ghost btn-sm", "Nouveau mot de passe"); r.type = "button";
+          var r = el("button", "btn btn-ghost btn-sm", "Nouveau lien"); r.type = "button";
           r.addEventListener("click", function () {
-            if (r.dataset.arm !== "1") { r.dataset.arm = "1"; r.textContent = "Confirmer ?"; setTimeout(function () { r.dataset.arm = ""; r.textContent = "Nouveau mot de passe"; }, 4000); return; }
-            api("POST", "/api/maintenance/accounts/" + a.id + "/reset-password").then(function (res) { secretBox("Nouveau mot de passe", a.login, res.temporaryPassword); loadAccounts(); }).catch(handleAuthLoss);
+            if (r.dataset.arm !== "1") { r.dataset.arm = "1"; r.textContent = "Confirmer ?"; setTimeout(function () { r.dataset.arm = ""; r.textContent = "Nouveau lien"; }, 4000); return; }
+            api("POST", "/api/maintenance/accounts/" + a.id + "/invite").then(function (res) { linkBox("Nouveau lien", a.name, a.phone || "", res.inviteUrl, res.expiresAt); loadAccounts(); }).catch(handleAuthLoss);
           });
           act.appendChild(t); act.appendChild(r);
         } else act.appendChild(el("small", null, "Compte protégé"));
@@ -226,15 +233,61 @@
   $("acc-form").addEventListener("submit", function (ev) {
     ev.preventDefault(); showErr("a-err", "");
     var f = ev.target, role = $("a-role").value;
-    var body = { login: $("a-login").value.trim(), name: $("a-name").value.trim(), role: role, commissariat: role === "CENTRAL" ? "" : $("a-com").value.trim() };
-    if (!body.login || !body.name) { showErr("a-err", "Renseignez l’identifiant et le nom."); return; }
+    var body = { name: $("a-name").value.trim(), phone: $("a-phone").value.trim(), role: role,
+      commissariat: (role === "COMMISSARIAT" || role === "AGENT") ? $("a-com").value.trim() : "",
+      section: (role === "BUREAU_RESP" || role === "BUREAU_AGENT") ? $("a-sec").value.trim() : "" };
+    if (!body.name || !body.phone) { showErr("a-err", "Renseignez le nom et le téléphone."); return; }
     busy(f, true);
     api("POST", "/api/maintenance/accounts", body).then(function (res) {
-      secretBox("Compte créé", res.account.login, res.temporaryPassword);
+      linkBox("Compte créé", res.account.name, res.account.phone, res.inviteUrl, res.expiresAt);
       f.reset(); syncRole(); loadAccounts();
     }).catch(function (e) { if (e.status === 401 || e.status === 403) handleAuthLoss(e); else showErr("a-err", msg(e)); })
       .then(function () { busy(f, false); });
   });
+
+  /* ---------- Caisse du bureau (confidentielle) ---------- */
+  var cashData = null;
+  function money(n) { return String(n || 0).replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " FCFA"; }
+  function cell(tr, t, cls) { tr.appendChild(el("td", cls || null, t == null ? "—" : String(t))); }
+  function groupRows(bodyId, list) {
+    var body = $(bodyId); body.replaceChildren();
+    if (!list.length) { var r = el("tr"), c = el("td", null, "Aucun enregistrement."); c.colSpan = 4; r.appendChild(c); body.appendChild(r); return; }
+    list.forEach(function (g) { var tr = el("tr"); cell(tr, g.name); cell(tr, g.today); cell(tr, g.count); cell(tr, money(g.total)); body.appendChild(tr); });
+  }
+  function loadCash() {
+    api("GET", "/api/maintenance/cash?limit=500").then(function (d) {
+      cashData = d;
+      var k = $("cash-kpis"); k.replaceChildren();
+      [["Aujourd’hui", d.todayCount + " moto(s)"], ["Encaissé aujourd’hui", money(d.todayTotal)], ["Motos depuis l’ouverture", d.allCount], ["Total encaissé", money(d.allTotal)]].forEach(function (t) {
+        var x = el("div", "kpi"); x.appendChild(el("b", null, String(t[1]))); x.appendChild(el("span", null, t[0])); k.appendChild(x);
+      });
+      groupRows("cash-agents", d.byAgent); groupRows("cash-sections", d.bySection);
+      var body = $("cash-journal"); body.replaceChildren();
+      if (!d.journal.length) { var r = el("tr"), c = el("td", null, "Aucun enregistrement pour le moment."); c.colSpan = 10; r.appendChild(c); body.appendChild(r); }
+      d.journal.forEach(function (j) {
+        var tr = el("tr"); cell(tr, fmt(j.at)); cell(tr, j.receipt, "mono"); cell(tr, j.plate, "mono"); cell(tr, j.ownerName); cell(tr, phoneFmt(j.ownerPhone), "mono");
+        cell(tr, money(j.amount)); cell(tr, j.mode); cell(tr, j.agent); cell(tr, j.checkedBy); cell(tr, j.section); body.appendChild(tr);
+      });
+      $("cash-updated").textContent = "Actualisé à " + new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    }).catch(handleAuthLoss);
+  }
+  $("cash-refresh").addEventListener("click", loadCash);
+  $("cash-print").addEventListener("click", function () {
+    if (!cashData) return;
+    var n = el("div");
+    n.appendChild(el("h1", null, "MotoSûr Mali · Journal du bureau"));
+    n.appendChild(el("p", "pz-sub", "Édité le " + fmt(new Date().toISOString()) + " · " + cashData.allCount + " enregistrements · total " + money(cashData.allTotal)));
+    var t = el("table"), th = el("tr");
+    ["Date", "Reçu", "Plaque", "Propriétaire", "Téléphone", "Montant", "Paiement", "Agent", "Relu par", "Bureau"].forEach(function (h) { th.appendChild(el("th", null, h)); });
+    t.appendChild(th);
+    cashData.journal.forEach(function (j) {
+      var tr = el("tr"); [fmt(j.at), j.receipt, j.plate, j.ownerName, phoneFmt(j.ownerPhone), money(j.amount), j.mode, j.agent, j.checkedBy, j.section].forEach(function (v) { tr.appendChild(el("td", null, v == null ? "—" : String(v))); });
+      t.appendChild(tr);
+    });
+    n.appendChild(t);
+    $("print-zone").replaceChildren(n); document.body.classList.add("printing"); window.print();
+  });
+  window.addEventListener("afterprint", function () { document.body.classList.remove("printing"); $("print-zone").replaceChildren(); });
 
   /* ---------- Journal ---------- */
   function loadAudit() {

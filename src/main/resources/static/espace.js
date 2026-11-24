@@ -3,21 +3,33 @@
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var ERR = {
-    INVALID_CREDENTIALS: "Identifiant ou mot de passe incorrect.",
+    INVALID_CREDENTIALS: "Téléphone ou mot de passe incorrect.",
     TOO_MANY_REQUESTS: "Trop de tentatives. Patientez quelques minutes.",
     LOCKED: "Compte verrouillé après trop d’essais. Réessayez dans 15 minutes.",
-    SUSPENDED: "Ce compte est suspendu. Contactez l’administrateur.",
-    WRONG_CURRENT_PASSWORD: "Le mot de passe provisoire est incorrect.",
-    WEAK_PASSWORD: "Mot de passe refusé : 12 caractères minimum, différent du provisoire.",
+    SUSPENDED: "Ce compte est suspendu. Contactez votre responsable.",
+    WRONG_CURRENT_PASSWORD: "Le mot de passe actuel est incorrect.",
+    WEAK_PASSWORD: "Mot de passe refusé : 10 caractères minimum, avec des lettres.",
     NOT_STOLEN: "Cette moto n’est plus signalée volée.",
-    INVALID_LOGIN: "Identifiant invalide (email pour un commissariat, matricule pour un agent).",
     COMMISSARIAT_REQUIRED: "Indiquez le commissariat.",
-    ALREADY_EXISTS: "Ce compte existe déjà.",
+    SECTION_REQUIRED: "Indiquez le bureau ou la section.",
+    ALREADY_EXISTS: "Un compte existe déjà avec ce numéro de téléphone.",
+    INVALID_PHONE: "Numéro de téléphone invalide : 8 chiffres attendus.",
+    INVALID_NAME: "Indiquez le nom de la personne.",
     ROLE_NOT_ALLOWED: "Vous ne pouvez pas créer ce niveau de compte.",
-    NOT_FOUND: "Compte introuvable.",
-    INVALID_COMMUNE: "Commune invalide."
+    NOT_FOUND: "Introuvable.",
+    INVALID_COMMUNE: "Commune invalide.",
+    INVALID_YEAR: "Année invalide.",
+    INVALID_DATE: "Date invalide (pas dans le futur, moins d’un an).",
+    INVALID_NUMBERS: "Plaque, châssis ou moteur trop courts.",
+    INVALID_PAYMENT_MODE: "Mode de paiement invalide.",
+    CHECKS_REQUIRED: "Cochez les deux contrôles avant d’enregistrer.",
+    SAME_CHECKER: "Le second agent doit être une autre personne que vous.",
+    PLATE_EXISTS: "Cette plaque est déjà enregistrée.",
+    CHASSIS_EXISTS: "Ce numéro de châssis est déjà enregistré.",
+    ENGINE_EXISTS: "Ce numéro de moteur est déjà enregistré.",
+    ALREADY_STOLEN: "Cette moto est déjà déclarée volée."
   };
-  var ROLE = { CENTRAL: "Direction générale", COMMISSARIAT: "Commissariat", AGENT: "Agent de terrain" };
+  var ROLE = { CENTRAL: "Direction générale", COMMISSARIAT: "Commissariat", AGENT: "Agent de terrain", BUREAU_RESP: "Responsable de bureau", BUREAU_AGENT: "Agent de bureau" };
   var COMMUNES = ["Commune I", "Commune II", "Commune III", "Commune IV", "Commune V", "Commune VI"];
   var me = null, recTarget = null, toastT;
 
@@ -63,22 +75,27 @@
   }
 
   /* ---------- navigation ---------- */
+  function isBureau() { return me && (me.role === "BUREAU_RESP" || me.role === "BUREAU_AGENT"); }
   function route() {
     if (!me) { show("view-login"); return; }
     if (me.role === "MAINTENANCE") { location.replace("maintenance.html"); return; }
     if (me.mustChangePassword) { ["p-cur", "p-new", "p-new2"].forEach(function (i) { $("#" + i).value = ""; }); showErr("p-err", ""); show("view-password"); $("#p-cur").focus(); return; }
-    $("#who").textContent = me.name + (me.commissariat ? " · " + me.commissariat : "");
+    var bureau = isBureau();
+    $("#who").textContent = me.name + (me.commissariat ? " · " + me.commissariat : "") + (me.section ? " · " + me.section : "");
     $("#role-label").textContent = ROLE[me.role] || me.role;
-    $("#app-title").textContent = me.role === "CENTRAL" ? "Direction générale" : "Espace police";
+    $("#app-title").textContent = me.role === "CENTRAL" ? "Direction générale" : bureau ? "Bureau d’enregistrement" : "Espace police";
     $("#tab-dash").hidden = me.role !== "CENTRAL";
+    $("#tab-alertes").hidden = bureau;
+    $("#tab-enreg").hidden = !bureau;
+    $("#tab-vol").hidden = !bureau;
     $("#rec-com-field").hidden = me.role !== "CENTRAL";
-    var canAdmin = me.role === "CENTRAL" || me.role === "COMMISSARIAT";
+    var canAdmin = me.role === "CENTRAL" || me.role === "COMMISSARIAT" || me.role === "BUREAU_RESP";
     $("#tab-comptes").hidden = !canAdmin;
     $("#a-role-field").hidden = me.role !== "CENTRAL";
     $("#a-com-field").hidden = me.role !== "CENTRAL";
-    $("#acc-title").textContent = me.role === "CENTRAL" ? "Créer un compte commissariat ou agent" : "Créer un compte agent pour votre commissariat";
+    $("#acc-title").textContent = me.role === "CENTRAL" ? "Créer un compte commissariat ou agent" : me.role === "COMMISSARIAT" ? "Créer un compte agent pour votre commissariat" : "Créer un compte agent pour votre bureau";
     syncRole();
-    show("view-app"); selectTab("verif");
+    show("view-app"); selectTab(bureau ? "enreg" : "verif");
   }
   function selectTab(name) {
     $$("[data-tab]").forEach(function (b) { var on = b.getAttribute("data-tab") === name; b.setAttribute("aria-selected", on ? "true" : "false"); b.tabIndex = on ? 0 : -1; });
@@ -87,6 +104,8 @@
     if (name === "alertes") loadAlerts();
     if (name === "dash") loadDash();
     if (name === "comptes") loadAccounts();
+    if (name === "enreg") loadMine();
+    if (name === "vol") { var d = $("#v-date"); d.max = new Date().toISOString().slice(0, 10); if (!d.value) d.value = d.max; }
   }
   $$("[data-tab]").forEach(function (b) {
     b.addEventListener("click", function () { selectTab(b.getAttribute("data-tab")); });
@@ -101,7 +120,7 @@
   /* ---------- connexion ---------- */
   $("#login-form").addEventListener("submit", function (ev) {
     ev.preventDefault(); showErr("l-err", ""); var f = ev.target, l = $("#l-login").value.trim(), p = $("#l-pass").value;
-    if (!l || !p) { showErr("l-err", "Saisissez l’identifiant et le mot de passe."); return; }
+    if (!l || !p) { showErr("l-err", "Saisissez votre numéro de téléphone et le mot de passe."); return; }
     busy(f, true);
     api("POST", "/api/auth/login", { login: l, password: p }).then(function (m) { me = m; $("#l-pass").value = ""; route(); })
       .catch(function (e) { showErr("l-err", msg(e)); }).then(function () { busy(f, false); });
@@ -109,7 +128,7 @@
   $("#logout").addEventListener("click", function () { api("POST", "/api/auth/logout").catch(function () {}).then(function () { me = null; show("view-login"); }); });
   $("#pw-form").addEventListener("submit", function (ev) {
     ev.preventDefault(); showErr("p-err", ""); var f = ev.target, n1 = $("#p-new").value;
-    if (n1.length < 12) { showErr("p-err", "12 caractères minimum."); return; }
+    if (n1.length < 10) { showErr("p-err", "10 caractères minimum."); return; }
     if (n1 !== $("#p-new2").value) { showErr("p-err", "Les deux mots de passe ne sont pas identiques."); return; }
     busy(f, true);
     api("POST", "/api/auth/password", { current: $("#p-cur").value, next: n1 }).then(function (m) { me = m; toast("Mot de passe enregistré."); route(); })
@@ -158,6 +177,7 @@
   /* ---------- alertes ---------- */
   var cs = $("#a-commune"); cs.appendChild(new Option("Toutes les communes", "")); COMMUNES.forEach(function (c) { cs.appendChild(new Option(c, c)); });
   var rc = $("#rec-commune"); COMMUNES.forEach(function (c) { rc.appendChild(new Option(c, c)); });
+  ["r-commune", "v-commune"].forEach(function (id) { var sel = $("#" + id); sel.appendChild(new Option("Choisir", "")); COMMUNES.forEach(function (c) { sel.appendChild(new Option(c, c)); }); });
   var aT; function reloadSoon() { clearTimeout(aT); aT = setTimeout(loadAlerts, 250); }
   $("#a-q").addEventListener("input", reloadSoon); $("#a-commune").addEventListener("change", loadAlerts); $("#a-status").addEventListener("change", loadAlerts);
   function loadAlerts() {
@@ -202,42 +222,45 @@
   });
 
 
-  /* ---------- comptes (Direction : commissariats et agents ; commissariat : ses agents) ---------- */
-  var ROLES = { COMMISSARIAT: "Commissariat", AGENT: "Agent" };
-  function curRole() { return me.role === "CENTRAL" ? $("#a-role").value : "AGENT"; }
+  /* ---------- comptes (par liens d'invitation) ---------- */
+  var ROLES = { COMMISSARIAT: "Commissariat", AGENT: "Agent de terrain", BUREAU_AGENT: "Agent de bureau" };
+  function curRole() { return me.role === "CENTRAL" ? $("#a-role").value : me.role === "COMMISSARIAT" ? "AGENT" : "BUREAU_AGENT"; }
   function syncRole() {
-    var agent = curRole() === "AGENT";
-    $("#a-login-label").textContent = agent ? "Matricule de l’agent" : "Email du commissariat";
+    if (!me) return;
+    $("#a-com-field").hidden = me.role !== "CENTRAL";
   }
   $("#a-role").addEventListener("change", syncRole);
-  function secretBox(title, login, pw) {
+  function copyText(t, ok) {
+    if (navigator.clipboard) navigator.clipboard.writeText(t).then(function () { toast(ok || "Copié."); }, function () { toast("Sélectionnez le lien pour le copier."); });
+    else toast("Sélectionnez le lien pour le copier.");
+  }
+  function linkBox(title, name, phoneNum, url, expires) {
     var b = $("#secret"); b.replaceChildren();
-    b.appendChild(el("b", null, title + " : " + login));
-    b.appendChild(el("p", "note", "Mot de passe provisoire, affiché une seule fois. Transmettez-le de façon sûre : il devra être changé à la première connexion."));
-    var p = el("div", "mono", pw); p.style.cssText = "font-size:1.3rem;font-weight:600;letter-spacing:.08em;user-select:all;overflow-wrap:anywhere;margin:6px 0"; b.appendChild(p);
+    b.appendChild(el("b", null, title + " : " + name));
+    b.appendChild(el("p", "note", "Lien personnel, valable jusqu’au " + fmtDT(expires) + " et utilisable une seule fois. Envoyez-le uniquement à cette personne."));
+    var u = el("div", "mono", url); u.style.cssText = "font-size:.85rem;user-select:all;overflow-wrap:anywhere;margin:6px 0"; b.appendChild(u);
     var row = el("div", "actions");
-    var c = el("button", "btn btn-ghost btn-sm", "Copier"); c.type = "button";
-    c.addEventListener("click", function () { if (navigator.clipboard) navigator.clipboard.writeText(pw).then(function () { toast("Copié."); }, function () { toast("Sélectionnez le texte pour le copier."); }); });
-    var x = el("button", "btn btn-ghost btn-sm", "Masquer"); x.type = "button";
-    x.addEventListener("click", function () { b.hidden = true; b.replaceChildren(); });
-    row.appendChild(c); row.appendChild(x); b.appendChild(row); b.hidden = false; b.scrollIntoView({ block: "nearest" });
+    var c = el("button", "btn btn-primary btn-sm", "Copier le lien"); c.type = "button"; c.addEventListener("click", function () { copyText(url, "Lien copié."); });
+    var w = el("a", "btn btn-secondary btn-sm", "Envoyer par WhatsApp"); w.target = "_blank"; w.rel = "noopener";
+    w.href = "https://wa.me/223" + phoneNum + "?text=" + encodeURIComponent("Bonjour " + name + ", voici votre lien personnel MotoSûr Mali pour ouvrir votre compte (valable 48 h, utilisable une seule fois) : " + url);
+    var x = el("button", "btn btn-ghost btn-sm", "Masquer"); x.type = "button"; x.addEventListener("click", function () { b.hidden = true; b.replaceChildren(); });
+    row.appendChild(c); row.appendChild(w); row.appendChild(x); b.appendChild(row); b.hidden = false; b.scrollIntoView({ block: "nearest" });
   }
   function loadAccounts() {
     api("GET", "/api/admin/accounts").then(function (list) {
       var body = $("#acc-body"); body.replaceChildren();
       if (!list.length) { emptyRow(body, 5, "Aucun compte pour le moment."); return; }
       list.forEach(function (a) {
-        var c1 = el("td"); c1.appendChild(el("b", null, a.name)); c1.appendChild(el("small", "mono", a.login)); if (a.commissariat) c1.appendChild(el("small", null, a.commissariat));
+        var c1 = el("td"); c1.appendChild(el("b", null, a.name)); c1.appendChild(el("small", "mono", phone(a.phone || a.login))); if (a.commissariat) c1.appendChild(el("small", null, a.commissariat)); if (a.section) c1.appendChild(el("small", null, a.section));
         var c3 = el("td"), locked = a.lockedUntil && new Date(a.lockedUntil) > new Date();
-        c3.appendChild(el("span", "pill " + (!a.active ? "pill-bad" : locked ? "pill-warn" : "pill-ok"), !a.active ? "Suspendu" : locked ? "Verrouillé" : "Actif"));
-        if (a.mustChangePassword) c3.appendChild(el("small", null, "Mot de passe provisoire"));
+        c3.appendChild(el("span", "pill " + (!a.active ? "pill-bad" : (a.pending || locked) ? "pill-warn" : "pill-ok"), !a.active ? "Suspendu" : a.pending ? "En attente du lien" : locked ? "Verrouillé" : "Actif"));
         var c5 = el("td"), act = el("div", "actions");
         var t = el("button", "btn btn-ghost btn-sm", a.active ? "Suspendre" : "Réactiver"); t.type = "button";
         t.addEventListener("click", function () { api("POST", "/api/admin/accounts/" + a.id + "/active", { active: !a.active }).then(function () { toast(a.active ? "Compte suspendu." : "Compte réactivé."); loadAccounts(); }).catch(authLoss); });
-        var r = el("button", "btn btn-ghost btn-sm", "Nouveau mot de passe"); r.type = "button";
+        var r = el("button", "btn btn-ghost btn-sm", "Nouveau lien"); r.type = "button";
         r.addEventListener("click", function () {
-          if (r.dataset.arm !== "1") { r.dataset.arm = "1"; r.textContent = "Confirmer ?"; setTimeout(function () { r.dataset.arm = ""; r.textContent = "Nouveau mot de passe"; }, 4000); return; }
-          api("POST", "/api/admin/accounts/" + a.id + "/reset-password").then(function (res) { secretBox("Nouveau mot de passe", a.login, res.temporaryPassword); loadAccounts(); }).catch(authLoss);
+          if (r.dataset.arm !== "1") { r.dataset.arm = "1"; r.textContent = "Confirmer ?"; setTimeout(function () { r.dataset.arm = ""; r.textContent = "Nouveau lien"; }, 4000); return; }
+          api("POST", "/api/admin/accounts/" + a.id + "/invite").then(function (res) { linkBox("Nouveau lien", a.name, a.phone || a.login, res.inviteUrl, res.expiresAt); loadAccounts(); }).catch(authLoss);
         });
         act.appendChild(t); act.appendChild(r); c5.appendChild(act);
         row(body, [c1, ROLES[a.role] || a.role, c3, fmtDT(a.lastLoginAt), c5]);
@@ -246,13 +269,96 @@
   }
   $("#acc-form").addEventListener("submit", function (ev) {
     ev.preventDefault(); showErr("a-err", ""); var f = ev.target, role = curRole();
-    var body = { login: $("#a-login").value.trim(), name: $("#a-name").value.trim(), role: role, commissariat: me.role === "CENTRAL" ? $("#a-com").value.trim() : "" };
-    if (!body.login || !body.name) { showErr("a-err", "Renseignez l’identifiant et le nom."); return; }
+    var body = { name: $("#a-name").value.trim(), phone: $("#a-phone").value.trim(), role: role, commissariat: me.role === "CENTRAL" ? $("#a-com").value.trim() : "" };
+    if (!body.name || !body.phone) { showErr("a-err", "Renseignez le nom et le téléphone."); return; }
     if (me.role === "CENTRAL" && !body.commissariat) { showErr("a-err", "Indiquez le commissariat."); return; }
     busy(f, true);
     api("POST", "/api/admin/accounts", body).then(function (res) {
-      secretBox("Compte créé", res.account.login, res.temporaryPassword); f.reset(); syncRole(); loadAccounts();
+      linkBox("Compte créé", res.account.name, res.account.phone, res.inviteUrl, res.expiresAt); f.reset(); syncRole(); loadAccounts();
     }).catch(function (e) { if (e.status === 401 || e.status === 403) authLoss(e); else showErr("a-err", msg(e)); }).then(function () { busy(f, false); });
+  });
+
+  /* ---------- impression ---------- */
+  function printNode(node) {
+    var z = $("#print-zone"); z.replaceChildren(node); document.body.classList.add("printing"); window.print();
+  }
+  window.addEventListener("afterprint", function () { document.body.classList.remove("printing"); $("#print-zone").replaceChildren(); });
+  function pzDl(rows) {
+    var d = el("dl");
+    rows.forEach(function (r) { d.appendChild(el("dt", null, r[0])); d.appendChild(el("dd", null, String(r[1]))); });
+    return d;
+  }
+  function receiptNode(d) {
+    var n = el("div");
+    n.appendChild(el("h1", null, "MotoSûr Mali · Reçu d’enregistrement"));
+    n.appendChild(el("p", "pz-sub", d.receipt + " · " + fmtDT(d.registeredAt) + " · " + (d.section || "")));
+    n.appendChild(pzDl([["Propriétaire", d.ownerName], ["Téléphone", phone(d.ownerPhone)], ["Plaque", d.plate], ["Marque et modèle", d.brand + " " + d.model + " · " + d.color + " · " + d.year], ["N° de châssis", d.chassis], ["N° de moteur", d.engine], ["Montant payé", d.amount + " FCFA (" + d.paymentMode + ")"], ["Enregistré par", d.agent + " · relu par " + d.checkedBy]]));
+    n.appendChild(el("h2", null, "Numéro d’enregistrement : " + d.reference));
+    n.appendChild(el("div", "pz-code", d.pin));
+    n.appendChild(el("p", "pz-note", "Gardez ce reçu. Le numéro d’enregistrement et le code secret permettent de déclarer un vol ou de lever l’alerte. Ne donnez le code à personne."));
+    return n;
+  }
+
+  /* ---------- bureau : enregistrement ---------- */
+  function reqVal(id) { return $("#" + id).value.trim(); }
+  $("#reg-form").addEventListener("submit", function (ev) {
+    ev.preventDefault(); showErr("r-err", ""); var f = ev.target;
+    var need = ["r-owner", "r-phone", "r-commune", "r-plate", "r-chassis", "r-engine", "r-brand", "r-model", "r-color", "r-year", "r-checker"];
+    for (var k = 0; k < need.length; k++) { if (!reqVal(need[k])) { showErr("r-err", "Renseignez tous les champs."); $("#" + need[k]).focus(); return; } }
+    if (!$("#r-chk1").checked || !$("#r-chk2").checked) { showErr("r-err", ERR.CHECKS_REQUIRED); return; }
+    var body = { ownerName: reqVal("r-owner"), phone: reqVal("r-phone"), commune: reqVal("r-commune"), plate: reqVal("r-plate"), chassis: reqVal("r-chassis"), engine: reqVal("r-engine"),
+      brand: reqVal("r-brand"), model: reqVal("r-model"), color: reqVal("r-color"), year: parseInt(reqVal("r-year"), 10), checkedBy: reqVal("r-checker"),
+      amount: parseInt($("#r-amount").value, 10) || 0, paymentMode: $("#r-mode").value, papersSeen: $("#r-chk1").checked, numbersChecked: $("#r-chk2").checked };
+    busy(f, true);
+    api("POST", "/api/bureau/motos", body).then(function (d) {
+      var done = $("#reg-done"); done.replaceChildren();
+      done.appendChild(status("ok", "Moto enregistrée et vérifiée en personne", "Remettez le reçu au propriétaire."));
+      var ref = el("div", "cert-ref"); ref.appendChild(el("span", null, "Numéro d’enregistrement")); ref.appendChild(el("span", "mono", d.reference)); done.appendChild(ref);
+      var pin = el("div", "cert-ref"); pin.appendChild(el("span", null, "Code secret")); var pv = el("span", "mono", d.pin); pv.style.cssText = "font-size:1.6rem;letter-spacing:.3em"; pin.appendChild(pv); done.appendChild(pin);
+      done.appendChild(dl([["Reçu", d.receipt, 1], ["Plaque", d.plate, 1], ["Propriétaire", d.ownerName], ["Téléphone", phone(d.ownerPhone), 1], ["Montant payé", d.amount + " FCFA · " + d.paymentMode], ["Saisi par", d.agent + " · relu par " + d.checkedBy]]));
+      done.appendChild(el("p", "note", "Le code secret n’est affiché qu’une fois. N’envoyez le reçu par WhatsApp que si le client le demande : il contient son code secret."));
+      var act = el("div", "actions");
+      var pr = el("button", "btn btn-primary", "Imprimer le reçu"); pr.type = "button"; pr.addEventListener("click", function () { printNode(receiptNode(d)); });
+      var wa = el("a", "btn btn-secondary", "Envoyer le reçu par WhatsApp"); wa.target = "_blank"; wa.rel = "noopener";
+      wa.href = "https://wa.me/223" + d.ownerPhone + "?text=" + encodeURIComponent("MotoSûr Mali · Reçu " + d.receipt + "\nMoto " + d.plate + " enregistrée.\nNuméro d’enregistrement : " + d.reference + "\nCode secret : " + d.pin + " (ne le donnez à personne)\nMontant payé : " + d.amount + " FCFA");
+      var again = el("button", "btn btn-ghost", "Enregistrer une autre moto"); again.type = "button";
+      again.addEventListener("click", function () { f.reset(); $("#r-amount").value = 2000; done.hidden = true; $("#reg-card").hidden = false; $("#r-owner").focus(); });
+      act.appendChild(pr); act.appendChild(wa); act.appendChild(again); done.appendChild(act);
+      $("#reg-card").hidden = true; done.hidden = false; done.scrollIntoView({ block: "start" }); loadMine();
+    }).catch(function (e) { if (e.status === 401 || e.status === 403) authLoss(e); else showErr("r-err", msg(e)); }).then(function () { busy(f, false); });
+  });
+  function loadMine() {
+    api("GET", "/api/bureau/motos/mine").then(function (list) {
+      var body = $("#mine-body"); body.replaceChildren();
+      if (!list.length) { emptyRow(body, 5, "Aucun enregistrement pour le moment."); return; }
+      list.forEach(function (m) {
+        var act = el("td"), b = el("button", "btn btn-ghost btn-sm", "Nouveau code secret"); b.type = "button";
+        b.addEventListener("click", function () {
+          if (b.dataset.arm !== "1") { b.dataset.arm = "1"; b.textContent = "Confirmer ?"; setTimeout(function () { b.dataset.arm = ""; b.textContent = "Nouveau code secret"; }, 4000); return; }
+          api("POST", "/api/bureau/motos/" + m.id + "/reset-pin").then(function (d) {
+            var box = $("#code-box"); box.replaceChildren();
+            box.appendChild(el("b", null, "Nouveau code pour " + d.plate + " (" + d.reference + ")"));
+            var c = el("div", "mono", d.pin); c.style.cssText = "font-size:1.6rem;letter-spacing:.3em;margin:6px 0"; box.appendChild(c);
+            box.appendChild(el("p", "note", "L’ancien code ne marche plus. Notez-le sur le reçu du propriétaire."));
+            box.hidden = false; box.scrollIntoView({ block: "center" });
+          }).catch(authLoss);
+        });
+        act.appendChild(b);
+        row(body, [m.receipt || "—", m.plate, m.ownerName, fmtDT(m.registeredAt), act]);
+      });
+    }).catch(authLoss);
+  }
+
+  /* ---------- bureau : déclaration de vol ---------- */
+  $("#vol-form").addEventListener("submit", function (ev) {
+    ev.preventDefault(); showErr("v-err", ""); var f = ev.target;
+    if (!reqVal("v-q") || !reqVal("v-date") || !reqVal("v-commune") || !reqVal("v-place")) { showErr("v-err", "Renseignez la moto, la date, la commune et le lieu."); return; }
+    busy(f, true);
+    api("POST", "/api/bureau/thefts", { q: reqVal("v-q"), date: reqVal("v-date"), commune: reqVal("v-commune"), place: reqVal("v-place"), details: reqVal("v-details") }).then(function (d) {
+      var done = $("#vol-done"); done.replaceChildren(); done.hidden = false;
+      done.appendChild(status("stolen", "Alerte enregistrée", "Moto " + d.plate + " · référence " + d.reference));
+      f.reset(); $("#v-date").value = $("#v-date").max;
+    }).catch(function (e) { if (e.status === 401 || e.status === 403) authLoss(e); else showErr("v-err", msg(e)); }).then(function () { busy(f, false); });
   });
 
   /* ---------- tableau de bord (Direction) ---------- */
