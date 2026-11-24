@@ -31,12 +31,8 @@
 
   $("iv-form").addEventListener("submit", function (ev) {
     ev.preventDefault(); showErr("");
-    var p1 = $("iv-pw").value, p2 = $("iv-pw2").value;
-    if (p1.length < 10) { showErr("10 caractères minimum."); return; }
-    if (/^\d+$/.test(p1)) { showErr("Le mot de passe ne peut pas être fait seulement de chiffres."); return; }
-    if (p1 !== p2) { showErr("Les deux mots de passe ne sont pas identiques."); return; }
     var b = ev.target.querySelector("button[type=submit]"); b.disabled = true;
-    api("POST", "/api/invitations/accept", { token: token, password: p1 }).then(function (me) {
+    api("POST", "/api/invitations/accept", { token: token }).then(function (me) {
       try { history.replaceState(null, "", location.pathname); } catch (e) {}
       location.replace(me.role === "MAINTENANCE" ? "maintenance.html" : "espace.html");
     }).catch(function (e) {

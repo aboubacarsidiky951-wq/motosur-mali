@@ -35,7 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/invitations")
 public class InvitationController {
     public record TokenRequest(@NotBlank @Size(max = 200) String token) {}
-    public record AcceptRequest(@NotBlank @Size(max = 200) String token, @NotBlank @Size(max = 200) String password) {}
+    public record AcceptRequest(@NotBlank @Size(max = 200) String token) {}
 
     private final InvitationRepository invitations;
     private final AccountRepository accounts;
@@ -80,13 +80,7 @@ public class InvitationController {
         Invitation inv = invitations.findByTokenHash(AccountService.sha256(r.token().trim())).orElse(null);
         if (!usable(inv)) throw new ApiException(410, "INVALID_LINK");
         Account a = inv.account;
-        String pw = r.password();
-        if (pw.length() < AuthController.MIN_PASSWORD || pw.equalsIgnoreCase(a.login) || pw.equalsIgnoreCase(a.name)
-                || pw.chars().allMatch(Character::isDigit)) {
-            throw new ApiException(400, "WEAK_PASSWORD");
-        }
         Instant now = Instant.now();
-        a.passwordHash = encoder.encode(pw);
         a.pending = false;
         a.mustChangePassword = false;
         a.failedAttempts = 0;

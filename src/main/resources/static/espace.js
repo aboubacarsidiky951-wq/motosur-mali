@@ -58,7 +58,7 @@
   function showErr(id, t) { var n = $("#" + id); n.textContent = t || ""; n.hidden = !t; }
   function busy(f, on) { var b = $("button[type=submit]", f); if (b) b.disabled = on; }
   function show(v) { ["view-login", "view-password", "view-app"].forEach(function (x) { $("#" + x).hidden = x !== v; }); $("#userbar").hidden = v === "view-login"; }
-  function authLoss(e) { if (e && (e.status === 401 || e.status === 403)) { me = null; show("view-login"); showErr("l-err", "Session expirée. Reconnectez-vous."); } else toast(msg(e)); }
+  function authLoss(e) { if (e && (e.status === 401 || e.status === 403)) { me = null; show("view-login"); showErr("l-err", "Votre session est terminée. Demandez un nouveau lien à votre responsable."); } else toast(msg(e)); }
 
   var ICON = {
     ok: '<path d="M8 12.5l3 3 5-6"/><circle cx="12" cy="12" r="9"/>',
@@ -119,14 +119,6 @@
     });
   });
 
-  /* ---------- connexion ---------- */
-  $("#login-form").addEventListener("submit", function (ev) {
-    ev.preventDefault(); showErr("l-err", ""); var f = ev.target, l = $("#l-login").value.trim(), p = $("#l-pass").value;
-    if (!l || !p) { showErr("l-err", "Saisissez votre numéro de téléphone et le mot de passe."); return; }
-    busy(f, true);
-    api("POST", "/api/auth/login", { login: l, password: p }).then(function (m) { me = m; $("#l-pass").value = ""; route(); })
-      .catch(function (e) { showErr("l-err", msg(e)); }).then(function () { busy(f, false); });
-  });
   $("#logout").addEventListener("click", function () { api("POST", "/api/auth/logout").catch(function () {}).then(function () { me = null; show("view-login"); }); });
   $("#pw-form").addEventListener("submit", function (ev) {
     ev.preventDefault(); showErr("p-err", ""); var f = ev.target, n1 = $("#p-new").value;
