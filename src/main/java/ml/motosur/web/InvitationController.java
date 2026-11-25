@@ -35,7 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/invitations")
 public class InvitationController {
     public record TokenRequest(@NotBlank @Size(max = 200) String token) {}
-    public record AcceptRequest(@NotBlank @Size(max = 200) String token) {}
+    public record AcceptRequest(@NotBlank @Size(max = 200) String token, @Size(max = 200) String password) {}
 
     private final InvitationRepository invitations;
     private final AccountRepository accounts;
@@ -81,6 +81,12 @@ public class InvitationController {
         if (!usable(inv)) throw new ApiException(410, "INVALID_LINK");
         Account a = inv.account;
         Instant now = Instant.now();
+        if (a.role == ml.motosur.domain.Role.MAINTENANCE) {
+            // Compte d'administration complet : un vrai mot de passe est exigé pour pouvoir se reconnecter.
+            String pw = r.password() == null ? "" : r.password();
+            if (pw.length() < 12 || pw.matches("\\d+")) throw new ApiException(400, "WEAK_PASSWORD");
+            a.passwordHash = encoder.encode(pw);
+        }
         a.pending = false;
         a.mustChangePassword = false;
         a.failedAttempts = 0;

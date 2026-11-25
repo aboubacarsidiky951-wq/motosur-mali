@@ -47,7 +47,8 @@ public class MaintenanceController {
         }
     }
     public record CreateAccount(@NotBlank @Size(max = 150) String name, @NotBlank @Size(max = 30) String phone,
-                                @NotNull Role role, @Size(max = 150) String commissariat, @Size(max = 80) String section) {}
+                                @NotNull Role role, @Size(max = 150) String commissariat, @Size(max = 80) String section,
+                                @Size(max = 150) String email) {}
     public record ActiveRequest(boolean active) {}
     public record AuditView(Instant at, String actor, String action, String detail, String ip) {
         static AuditView of(AuditLog l) {
@@ -127,7 +128,7 @@ public class MaintenanceController {
     @PostMapping("/accounts")
     public ResponseEntity<?> createAccount(@Valid @RequestBody CreateAccount r, HttpServletRequest req) {
         AccountService.Created c = accountService.create(actor(), r.name(), r.phone(), r.role(), r.commissariat(),
-                r.section(), AccountService.baseUrl(req), req.getRemoteAddr());
+                r.section(), AccountService.baseUrl(req), req.getRemoteAddr(), r.email());
         return ResponseEntity.status(201).body(AdminController.view(c));
     }
 

@@ -41,12 +41,16 @@
     </div>
     <div class="card" style="max-width:460px">
       <form id="iv-form" class="form" novalidate>
+        <div id="iv-pwbox" hidden>
+          <div class="field"><label for="iv-pw">Choisissez votre mot de passe (12 caractères minimum)</label><input id="iv-pw" type="password" autocomplete="new-password"></div>
+          <div class="field"><label for="iv-pw2">Répétez le mot de passe</label><input id="iv-pw2" type="password" autocomplete="new-password"></div>
+        </div>
         <p class="err" id="iv-err" role="alert" hidden></p>
         <div class="actions"><button class="btn btn-primary" type="submit">Ouvrir mon espace</button></div>
       </form>
     </div>
   </section>
 </main>
-<script src="invitation.js?v=2"></script>
+<script src="invitation.js?v=3"></script>
 </body>
 </html>

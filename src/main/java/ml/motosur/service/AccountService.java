@@ -74,9 +74,14 @@ public class AccountService {
         return encoder.encode(randomToken());
     }
 
-    @Transactional
     public Created create(String actor, String name, String phoneIn, Role role, String commissariat, String section,
                           String baseUrl, String ip) {
+        return create(actor, name, phoneIn, role, commissariat, section, baseUrl, ip, null);
+    }
+
+    @Transactional
+    public Created create(String actor, String name, String phoneIn, Role role, String commissariat, String section,
+                          String baseUrl, String ip, String email) {
         String ph = phone8(phoneIn);
         if (ph == null) throw new ApiException(400, "INVALID_PHONE");
         String cleanName = name == null ? "" : name.trim();
@@ -87,9 +92,16 @@ public class AccountService {
         String sec = section == null ? "" : section.trim();
         if (needsCom && com.isEmpty()) throw new ApiException(400, "COMMISSARIAT_REQUIRED");
         if (needsSection && sec.isEmpty()) throw new ApiException(400, "SECTION_REQUIRED");
-        if (accounts.existsByLoginIgnoreCase(ph)) throw new ApiException(409, "ALREADY_EXISTS");
+        String loginId = ph;
+        if (role == Role.MAINTENANCE) {
+            // Les comptes de maintenance se connectent avec leur email (le numéro peut servir à un compte de bureau).
+            String em = email == null ? "" : email.trim().toLowerCase(java.util.Locale.ROOT);
+            if (!em.matches("[^@\\s]+@[^@\\s]+\\.[^@\\s]+")) throw new ApiException(400, "INVALID_EMAIL");
+            loginId = em;
+        }
+        if (accounts.existsByLoginIgnoreCase(loginId)) throw new ApiException(409, "ALREADY_EXISTS");
         Account a = new Account();
-        a.login = ph;
+        a.login = loginId;
         a.phone = ph;
         a.name = cleanName;
         a.role = role;

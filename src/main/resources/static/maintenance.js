@@ -10,6 +10,7 @@
     COMMISSARIAT_REQUIRED: "Indiquez le commissariat.",
     SECTION_REQUIRED: "Indiquez le bureau ou la section.",
     ALREADY_EXISTS: "Un compte existe déjà avec ce numéro de téléphone.",
+    INVALID_EMAIL: "Email invalide.",
     INVALID_PHONE: "Numéro de téléphone invalide : 8 chiffres attendus.",
     INVALID_NAME: "Indiquez le nom de la personne.",
     ROLE_NOT_ALLOWED: "Action non autorisée sur ce niveau.",
@@ -174,6 +175,7 @@
   /* ---------- Comptes ---------- */
   function syncRole() {
     var r = $("a-role").value;
+    $("a-email-field").hidden = r !== "MAINTENANCE";
     $("a-com-field").hidden = !(r === "COMMISSARIAT" || r === "AGENT");
     $("a-sec-field").hidden = !(r === "BUREAU_RESP" || r === "BUREAU_AGENT");
   }
@@ -235,7 +237,9 @@
     var f = ev.target, role = $("a-role").value;
     var body = { name: $("a-name").value.trim(), phone: $("a-phone").value.trim(), role: role,
       commissariat: (role === "COMMISSARIAT" || role === "AGENT") ? $("a-com").value.trim() : "",
-      section: (role === "BUREAU_RESP" || role === "BUREAU_AGENT") ? $("a-sec").value.trim() : "" };
+      section: (role === "BUREAU_RESP" || role === "BUREAU_AGENT") ? $("a-sec").value.trim() : "",
+      email: role === "MAINTENANCE" ? $("a-email").value.trim() : "" };
+    if (role === "MAINTENANCE" && !body.email) { showErr("a-err", "Renseignez l’email de connexion."); return; }
     if (!body.name || !body.phone) { showErr("a-err", "Renseignez le nom et le téléphone."); return; }
     busy(f, true);
     api("POST", "/api/maintenance/accounts", body).then(function (res) {

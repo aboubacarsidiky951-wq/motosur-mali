@@ -38,7 +38,7 @@
         <p class="note">Cet espace est réservé au responsable technique du site.</p>
       </div>
       <form id="login-form" novalidate>
-        <div class="field"><label for="l-login">Email</label><input id="l-login" type="text" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
+        <div class="field"><label for="l-login">Email ou numéro de téléphone</label><input id="l-login" type="text" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
         <div class="field"><label for="l-pass">Mot de passe</label><input id="l-pass" type="password" autocomplete="current-password"></div>
         <p class="err" id="l-err" role="alert" hidden></p>
         <button class="btn btn-primary" type="submit">Se connecter</button>
@@ -106,6 +106,7 @@
               </select></div>
             <div class="field"><label for="a-name">Nom de la personne</label><input id="a-name" type="text" autocomplete="off"></div>
             <div class="field"><label for="a-phone">Téléphone (WhatsApp)</label><input id="a-phone" type="tel" inputmode="numeric" placeholder="70 00 00 00" autocomplete="off"></div>
+            <div class="field" id="a-email-field" hidden><label for="a-email">Email de connexion (compte de maintenance)</label><input id="a-email" type="text" inputmode="email" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="prenom@exemple.com"></div>
             <div class="field" id="a-com-field" hidden><label for="a-com">Commissariat</label><input id="a-com" type="text" autocomplete="off" placeholder="Commissariat du 1er arrondissement"></div>
             <div class="field" id="a-sec-field" hidden><label for="a-sec">Bureau / section</label><input id="a-sec" type="text" autocomplete="off" placeholder="Bureau central"></div>
           </div>
@@ -154,6 +155,6 @@
 </main>
 <div id="toast" role="status" aria-live="polite"><span></span></div>
 <div id="print-zone" aria-hidden="true"></div>
-<script src="maintenance.js?v=6"></script>
+<script src="maintenance.js?v=7"></script>
 </body>
 </html>
