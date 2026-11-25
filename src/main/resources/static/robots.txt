@@ -4,3 +4,5 @@ Disallow: /api/
 Disallow: /maintenance.html
 Disallow: /espace.html
 Disallow: /invitation.html
+
+Sitemap: https://motosur-mali-595j.onrender.com/sitemap.xml
