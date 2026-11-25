@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /maintenance.html
+Disallow: /espace.html
+Disallow: /invitation.html
