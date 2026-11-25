@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="style.css?v=10">
+<link rel="stylesheet" href="style.css?v=11">
 <link rel="stylesheet" href="print.css?v=2">
 </head>
 <body>
@@ -57,12 +57,12 @@
       <h1 id="app-title">Espace police</h1>
     </div>
     <div class="tabs" role="tablist" aria-label="Espace">
-      <button type="button" role="tab" id="tab-enreg" data-tab="enreg" aria-selected="false" tabindex="-1" aria-controls="panel-enreg" hidden>Enregistrer une moto</button>
-      <button type="button" role="tab" id="tab-verif" data-tab="verif" aria-selected="true" aria-controls="panel-verif">Vérification sur place</button>
-      <button type="button" role="tab" id="tab-vol" data-tab="vol" aria-selected="false" tabindex="-1" aria-controls="panel-vol" hidden>Déclarer un vol</button>
-      <button type="button" role="tab" id="tab-alertes" data-tab="alertes" aria-selected="false" tabindex="-1" aria-controls="panel-alertes">Alertes vol</button>
-      <button type="button" role="tab" id="tab-comptes" data-tab="comptes" aria-selected="false" tabindex="-1" aria-controls="panel-comptes" hidden>Comptes</button>
-      <button type="button" role="tab" id="tab-dash" data-tab="dash" aria-selected="false" tabindex="-1" aria-controls="panel-dash" hidden>Tableau de bord</button>
+      <button type="button" role="tab" aria-label="Enregistrer une moto" id="tab-enreg" data-tab="enreg" aria-selected="false" tabindex="-1" aria-controls="panel-enreg" hidden><svg class="ti" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M12 8.5v7M8.5 12h7"/></svg><span>Enregistrer</span></button>
+      <button type="button" role="tab" aria-label="Vérification sur place" id="tab-verif" data-tab="verif" aria-selected="true" aria-controls="panel-verif"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.4-4.4"/></svg><span>Vérifier</span></button>
+      <button type="button" role="tab" aria-label="Déclarer un vol" id="tab-vol" data-tab="vol" aria-selected="false" tabindex="-1" aria-controls="panel-vol" hidden><svg class="ti" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l9 15.5H3L12 4z"/><path d="M12 10v4.2M12 17v.01"/></svg><span>Vol</span></button>
+      <button type="button" role="tab" aria-label="Alertes vol" id="tab-alertes" data-tab="alertes" aria-selected="false" tabindex="-1" aria-controls="panel-alertes"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5V11a6 6 0 0112 0v5.5l1.5 2h-15L6 16.5z"/><path d="M10 21h4"/></svg><span>Alertes</span></button>
+      <button type="button" role="tab" aria-label="Comptes" id="tab-comptes" data-tab="comptes" aria-selected="false" tabindex="-1" aria-controls="panel-comptes" hidden><svg class="ti" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c.6-3.2 3-5 6-5s5.4 1.8 6 5"/><circle cx="17" cy="9" r="2.4"/><path d="M17 14.2c2.2.3 3.6 1.7 4 4.3"/></svg><span>Comptes</span></button>
+      <button type="button" role="tab" aria-label="Tableau de bord" id="tab-dash" data-tab="dash" aria-selected="false" tabindex="-1" aria-controls="panel-dash" hidden><svg class="ti" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 20V10M10 20V5M15.5 20v-7M21 20v-11"/></svg><span>Tableau</span></button>
     </div>
 
     <div id="panel-enreg" data-panel="enreg" role="tabpanel" aria-labelledby="tab-enreg" hidden>
