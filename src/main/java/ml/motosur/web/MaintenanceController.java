@@ -22,6 +22,8 @@ import ml.motosur.domain.AuditLog;
 import ml.motosur.domain.AuditRepository;
 import ml.motosur.domain.Moto;
 import ml.motosur.domain.MotoRepository;
+import ml.motosur.domain.OwnershipTransfer;
+import ml.motosur.domain.OwnershipTransferRepository;
 import ml.motosur.domain.Role;
 import ml.motosur.domain.TheftRepository;
 import ml.motosur.service.AccountService;
@@ -64,10 +66,13 @@ public class MaintenanceController {
     private final AccountService accountService;
     private final DataSource dataSource;
     private final String version;
+    private final OwnershipTransferRepository transfers;
 
     public MaintenanceController(AccountRepository accounts, AuditRepository auditRepo, AuditService audit,
                                  MotoRepository motos, TheftRepository thefts, AccountService accountService,
-                                 DataSource dataSource, @Value("${motosur.version:0.1.0}") String version) {
+                                 DataSource dataSource, @Value("${motosur.version:0.1.0}") String version,
+                                 OwnershipTransferRepository transfers) {
+        this.transfers = transfers;
         this.accounts = accounts;
         this.auditRepo = auditRepo;
         this.audit = audit;
@@ -165,26 +170,40 @@ public class MaintenanceController {
      * Caisse du bureau (confidentielle : réservée à la maintenance) : totaux, détail par agent et par bureau,
      * et journal des paiements (nom, téléphone et montant payé par chaque propriétaire).
      */
+    /** Une ligne de la caisse : un enregistrement ou un transfert de propriété. */
+    private record Pay(Instant at, String receipt, String reference, String plate, String ownerName, String ownerPhone,
+                       Integer amount, String mode, String agent, String checkedBy, String section, String kind) {}
+
     @GetMapping("/cash")
     @Transactional(readOnly = true)
     public Map<String, Object> cash(@RequestParam(defaultValue = "300") int limit) {
         LocalDate today = LocalDate.now(ZoneOffset.UTC);
-        List<Moto> paid = motos.findByPaidAmountNotNullOrderByRegisteredAtDesc();
+        List<Pay> paid = new ArrayList<>();
+        for (Moto m : motos.findByPaidAmountNotNullOrderByRegisteredAtDesc()) {
+            paid.add(new Pay(m.registeredAt, m.receiptNo, m.reference, m.plate, m.ownerName, m.ownerPhone,
+                    m.paidAmount, m.paymentMode, m.registeredByName, m.checkedBy, m.section, "Enregistrement"));
+        }
+        for (OwnershipTransfer t : transfers.findAllByOrderByAtDesc()) {
+            if (t.paidAmount == null) continue;
+            paid.add(new Pay(t.at, t.receiptNo, t.moto.reference, t.moto.plate, t.toName, t.toPhone,
+                    t.paidAmount, t.paymentMode, t.agentName, t.checkedBy, t.section, "Transfert"));
+        }
+        paid.sort((x, y) -> y.at().compareTo(x.at()));
         long totalAll = 0;
         long totalToday = 0;
         long countToday = 0;
         Map<String, long[]> byAgent = new LinkedHashMap<>();
         Map<String, long[]> bySection = new LinkedHashMap<>();
-        for (Moto m : paid) {
-            long amount = m.paidAmount == null ? 0 : m.paidAmount;
-            boolean isToday = m.registeredAt.atZone(ZoneOffset.UTC).toLocalDate().equals(today);
+        for (Pay m : paid) {
+            long amount = m.amount() == null ? 0 : m.amount();
+            boolean isToday = m.at().atZone(ZoneOffset.UTC).toLocalDate().equals(today);
             totalAll += amount;
             if (isToday) {
                 totalToday += amount;
                 countToday++;
             }
-            long[] a = byAgent.computeIfAbsent(m.registeredByName == null ? "—" : m.registeredByName, k -> new long[3]);
-            long[] b = bySection.computeIfAbsent(m.section == null ? "—" : m.section, k -> new long[3]);
+            long[] a = byAgent.computeIfAbsent(m.agent() == null ? "—" : m.agent(), k -> new long[3]);
+            long[] b = bySection.computeIfAbsent(m.section() == null ? "—" : m.section(), k -> new long[3]);
             a[0]++;
             a[1] += amount;
             b[0]++;
@@ -200,19 +219,20 @@ public class MaintenanceController {
         bySection.forEach((k, v) -> sections.add(group(k, v)));
         int size = Math.max(1, Math.min(limit, 1000));
         List<Map<String, Object>> journal = new ArrayList<>();
-        for (Moto m : paid.stream().limit(size).toList()) {
+        for (Pay m : paid.stream().limit(size).toList()) {
             Map<String, Object> o = new LinkedHashMap<>();
-            o.put("at", m.registeredAt);
-            o.put("receipt", m.receiptNo);
-            o.put("reference", m.reference);
-            o.put("plate", m.plate);
-            o.put("ownerName", m.ownerName);
-            o.put("ownerPhone", m.ownerPhone);
-            o.put("amount", m.paidAmount);
-            o.put("mode", m.paymentMode);
-            o.put("agent", m.registeredByName);
-            o.put("checkedBy", m.checkedBy);
-            o.put("section", m.section);
+            o.put("at", m.at());
+            o.put("receipt", m.receipt());
+            o.put("reference", m.reference());
+            o.put("plate", m.plate());
+            o.put("ownerName", m.ownerName());
+            o.put("ownerPhone", m.ownerPhone());
+            o.put("amount", m.amount());
+            o.put("mode", m.mode());
+            o.put("agent", m.agent());
+            o.put("checkedBy", m.checkedBy());
+            o.put("section", m.section());
+            o.put("kind", m.kind());
             journal.add(o);
         }
         Map<String, Object> out = new LinkedHashMap<>();

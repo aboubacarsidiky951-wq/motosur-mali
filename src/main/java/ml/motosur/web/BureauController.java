@@ -8,6 +8,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.security.SecureRandom;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -16,10 +17,13 @@ import ml.motosur.domain.Account;
 import ml.motosur.domain.AccountRepository;
 import ml.motosur.domain.Moto;
 import ml.motosur.domain.MotoRepository;
+import ml.motosur.domain.OwnershipTransfer;
+import ml.motosur.domain.OwnershipTransferRepository;
 import ml.motosur.domain.Theft;
 import ml.motosur.domain.TheftRepository;
 import ml.motosur.service.AccountService;
 import ml.motosur.service.AuditService;
+import ml.motosur.service.SmsService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -54,6 +58,18 @@ public class BureauController {
             boolean papersSeen,
             boolean numbersChecked) {}
 
+    public record TransferRequest(
+            @NotBlank @Size(max = 60) String q,
+            @NotBlank @Size(max = 10) String pin,
+            @NotBlank @Size(max = 150) String newOwnerName,
+            @NotBlank @Size(max = 30) String phone,
+            @NotBlank @Size(max = 40) String commune,
+            @NotBlank @Size(max = 150) String checkedBy,
+            @NotNull @Min(0) @Max(10_000_000) Integer amount,
+            @NotBlank @Size(max = 20) String paymentMode,
+            boolean idsSeen,
+            boolean papersSeen) {}
+
     public record TheftRequest(
             @NotBlank @Size(max = 60) String q,
             @NotNull LocalDate date,
@@ -66,9 +82,14 @@ public class BureauController {
     private final AccountRepository accounts;
     private final PasswordEncoder encoder;
     private final AuditService audit;
+    private final OwnershipTransferRepository transfers;
+    private final SmsService sms;
 
     public BureauController(MotoRepository motos, TheftRepository thefts, AccountRepository accounts,
-                            PasswordEncoder encoder, AuditService audit) {
+                            PasswordEncoder encoder, AuditService audit,
+                            OwnershipTransferRepository transfers, SmsService sms) {
+        this.transfers = transfers;
+        this.sms = sms;
         this.motos = motos;
         this.thefts = thefts;
         this.accounts = accounts;
@@ -98,7 +119,7 @@ public class BureauController {
     }
 
     @PostMapping("/motos")
-    @Transactional
+    @Transactional(noRollbackFor = ApiException.class)
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest r, HttpServletRequest req) {
         Account who = me();
         String ph = AccountService.phone8(r.phone());
@@ -116,9 +137,22 @@ public class BureauController {
         String chassis = PublicController.norm(r.chassis());
         String engine = PublicController.norm(r.engine());
         if (plate.length() < 4 || chassis.length() < 5 || engine.length() < 4) throw new ApiException(400, "INVALID_NUMBERS");
-        if (motos.existsByPlate(plate)) throw new ApiException(409, "PLATE_EXISTS");
-        if (motos.existsByChassis(chassis)) throw new ApiException(409, "CHASSIS_EXISTS");
-        if (motos.existsByEngine(engine)) throw new ApiException(409, "ENGINE_EXISTS");
+        // Un numéro déjà connu, même saisi dans une autre case (châssis dans moteur, etc.), est refusé.
+        Moto dup = null;
+        for (String v : new String[] {plate, chassis, engine}) {
+            dup = motos.findFirstByPlateOrChassisOrEngine(v, v, v).orElse(null);
+            if (dup != null) break;
+        }
+        if (dup != null) {
+            boolean stolen = dup.status == Moto.Status.STOLEN;
+            audit.log(who.login, stolen ? "DUPLICATE_STOLEN_ATTEMPT" : "DUPLICATE_ATTEMPT",
+                    dup.reference + " " + dup.plate + " · saisi au bureau " + who.section, req.getRemoteAddr());
+            if (stolen) throw new ApiException(409, "MOTO_STOLEN_DUPLICATE");
+            if (dup.plate.equals(plate)) throw new ApiException(409, "PLATE_EXISTS");
+            if (dup.chassis.equals(chassis)) throw new ApiException(409, "CHASSIS_EXISTS");
+            if (dup.engine.equals(engine)) throw new ApiException(409, "ENGINE_EXISTS");
+            throw new ApiException(409, "NUMBER_EXISTS");
+        }
 
         String pin = newPin();
         Moto m = new Moto();
@@ -182,6 +216,108 @@ public class BureauController {
             o.put("registeredAt", m.registeredAt);
             return o;
         }).toList();
+    }
+
+    /**
+     * Vente d'une moto, faite au bureau : le vendeur donne son code secret, le nouveau propriétaire est enregistré,
+     * un nouveau code secret est généré (l'ancien cesse de marcher) et le changement est gardé dans l'historique.
+     */
+    @PostMapping("/motos/transfer")
+    @Transactional(noRollbackFor = ApiException.class)
+    public ResponseEntity<?> transfer(@Valid @RequestBody TransferRequest r, HttpServletRequest req) {
+        Account who = me();
+        String ph = AccountService.phone8(r.phone());
+        if (ph == null) throw new ApiException(400, "INVALID_PHONE");
+        if (!PublicController.COMMUNES.contains(r.commune())) throw new ApiException(400, "INVALID_COMMUNE");
+        if (!r.idsSeen() || !r.papersSeen()) throw new ApiException(400, "CHECKS_REQUIRED");
+        if (!MODES.contains(r.paymentMode())) throw new ApiException(400, "INVALID_PAYMENT_MODE");
+        String checker = r.checkedBy().trim();
+        if (checker.equalsIgnoreCase(who.name)) throw new ApiException(400, "SAME_CHECKER");
+        if (!accounts.existsByNameIgnoreCaseAndSectionAndActiveTrue(checker, who.section)) {
+            throw new ApiException(400, "CHECKER_UNKNOWN");
+        }
+        String n = PublicController.norm(r.q());
+        if (n.length() < 4) throw new ApiException(400, "INVALID_NUMBERS");
+        Moto m = motos.findByReference(PublicController.formatRef(r.q()))
+                .or(() -> motos.findFirstByPlateOrChassisOrEngine(n, n, n)).orElse(null);
+        if (m == null) throw new ApiException(404, "NOT_FOUND");
+        if (m.status == Moto.Status.STOLEN) {
+            audit.log(who.login, "TRANSFER_REFUSED_STOLEN", m.reference + " " + m.plate, req.getRemoteAddr());
+            throw new ApiException(409, "MOTO_STOLEN");
+        }
+        Instant now = Instant.now();
+        if (m.pinLockedUntil != null && m.pinLockedUntil.isAfter(now)) throw new ApiException(423, "PIN_LOCKED");
+        String pinIn = r.pin().trim();
+        if (m.pinHash == null || !pinIn.matches("\\d{4}") || !encoder.matches(pinIn, m.pinHash)) {
+            m.pinFails++;
+            if (m.pinFails >= 5) {
+                m.pinLockedUntil = now.plusSeconds(3600);
+                m.pinFails = 0;
+                audit.log("système", "PIN_LOCKED", "Moto " + m.plate + " bloquée 1 h après 5 codes faux", req.getRemoteAddr());
+            }
+            motos.save(m);
+            audit.log(who.login, "TRANSFER_BAD_PIN", m.reference + " " + m.plate, req.getRemoteAddr());
+            throw new ApiException(403, "WRONG_PIN");
+        }
+        String newName = r.newOwnerName().trim();
+        if (ph.equals(m.ownerPhone) && newName.equalsIgnoreCase(m.ownerName)) throw new ApiException(400, "SAME_OWNER");
+
+        OwnershipTransfer t = new OwnershipTransfer();
+        t.moto = m;
+        t.fromName = m.ownerName;
+        t.fromPhone = m.ownerPhone;
+        t.toName = newName;
+        t.toPhone = ph;
+        t.toCommune = r.commune();
+        t.section = who.section;
+        t.agentLogin = who.login;
+        t.agentName = who.name;
+        t.checkedBy = checker;
+        t.paidAmount = r.amount();
+        t.paymentMode = r.paymentMode();
+        transfers.save(t);
+        t.receiptNo = "TRF-" + LocalDate.now().getYear() + "-" + String.format("%05d", t.id);
+
+        String oldName = m.ownerName;
+        String oldPhone = m.ownerPhone;
+        String pin = newPin();
+        m.ownerName = newName;
+        m.ownerPhone = ph;
+        m.commune = r.commune();
+        m.pinHash = encoder.encode(pin);
+        m.pinFails = 0;
+        m.pinLockedUntil = null;
+        if (m.status == Moto.Status.RECOVERED) m.status = Moto.Status.OK;
+        motos.save(m);
+        audit.log(who.login, "MOTO_TRANSFERRED", m.reference + " " + m.plate + " · " + oldName + " → " + newName
+                + " · " + t.receiptNo + " · " + who.section + " · relu par " + checker, req.getRemoteAddr());
+        // Prévient l'ancien propriétaire (si le fournisseur de SMS est configuré) : signal utile en cas de fraude.
+        sms.send(oldPhone, "MotoSûr : votre moto " + m.plate + " a été transférée à un autre propriétaire au bureau "
+                + who.section + ". Si ce n'est pas vous, contactez MotoSûr.");
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", m.id);
+        out.put("reference", m.reference);
+        out.put("receipt", t.receiptNo);
+        out.put("pin", pin); // affiché une seule fois
+        out.put("plate", m.plate);
+        out.put("fromName", oldName);
+        out.put("ownerName", m.ownerName);
+        out.put("ownerPhone", m.ownerPhone);
+        out.put("brand", m.brand);
+        out.put("model", m.model);
+        out.put("color", m.color);
+        out.put("year", m.year);
+        out.put("chassis", m.chassis);
+        out.put("engine", m.engine);
+        out.put("commune", m.commune);
+        out.put("section", who.section);
+        out.put("agent", who.name);
+        out.put("checkedBy", checker);
+        out.put("amount", t.paidAmount);
+        out.put("paymentMode", t.paymentMode);
+        out.put("registeredAt", t.at);
+        return ResponseEntity.ok(out);
     }
 
     /** Reçu perdu : un nouveau code secret est généré et l'ancien cesse de fonctionner. */

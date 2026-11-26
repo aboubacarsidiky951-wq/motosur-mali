@@ -13,6 +13,7 @@ import ml.motosur.domain.Account;
 import ml.motosur.domain.AccountRepository;
 import ml.motosur.domain.Role;
 import ml.motosur.service.AuditService;
+import ml.motosur.service.TotpService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -31,7 +32,8 @@ public class AuthController {
     static final long LOCK_MINUTES = 15;
     static final int MIN_PASSWORD = 10;
 
-    public record LoginRequest(@NotBlank @Size(max = 120) String login, @NotBlank @Size(max = 200) String password) {}
+    public record LoginRequest(@NotBlank @Size(max = 120) String login, @NotBlank @Size(max = 200) String password,
+                               @Size(max = 12) String code) {}
 
     public record PasswordRequest(@NotBlank @Size(max = 200) String current, @NotBlank @Size(max = 200) String next) {}
 
@@ -45,11 +47,13 @@ public class AuthController {
     private final PasswordEncoder encoder;
     private final SecurityContextRepository contextRepository;
     private final AuditService audit;
+    private final TotpService totp;
     private final String dummyHash;
     private final RateLimiter loginLimit = new RateLimiter(20, 600_000);
 
     public AuthController(AccountRepository accounts, PasswordEncoder encoder,
-                          SecurityContextRepository contextRepository, AuditService audit) {
+                          SecurityContextRepository contextRepository, AuditService audit, TotpService totp) {
+        this.totp = totp;
         this.accounts = accounts;
         this.encoder = encoder;
         this.contextRepository = contextRepository;
@@ -97,6 +101,27 @@ public class AuthController {
         if (!a.active) {
             audit.log(a.login, "LOGIN_BLOCKED", "Compte suspendu", ip);
             return ResponseEntity.status(403).body(Map.of("error", "SUSPENDED"));
+        }
+
+        // Double vérification des comptes de maintenance : le mot de passe est bon, il faut aussi le code à 6 chiffres.
+        if (a.role == Role.MAINTENANCE && a.totpEnabled) {
+            String code = r.code() == null ? "" : r.code().trim();
+            if (code.isEmpty()) {
+                return ResponseEntity.status(401).body(Map.of("error", "TOTP_REQUIRED"));
+            }
+            long step = totp.verify(a.totpSecret, code, a.lastTotpStep);
+            if (step < 0) {
+                a.failedAttempts++;
+                if (a.failedAttempts >= MAX_ATTEMPTS) {
+                    a.lockedUntil = now.plusSeconds(LOCK_MINUTES * 60);
+                    a.failedAttempts = 0;
+                    audit.log(a.login, "ACCOUNT_LOCKED", "Trop de codes faux : verrouillé " + LOCK_MINUTES + " min", ip);
+                }
+                accounts.save(a);
+                audit.log(a.login, "LOGIN_FAILED", "Code de double vérification incorrect", ip);
+                return ResponseEntity.status(401).body(Map.of("error", "INVALID_CODE"));
+            }
+            a.lastTotpStep = step;
         }
 
         a.failedAttempts = 0;

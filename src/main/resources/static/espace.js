@@ -29,7 +29,13 @@
     PLATE_EXISTS: "Cette plaque est déjà enregistrée.",
     CHASSIS_EXISTS: "Ce numéro de châssis est déjà enregistré.",
     ENGINE_EXISTS: "Ce numéro de moteur est déjà enregistré.",
-    ALREADY_STOLEN: "Cette moto est déjà déclarée volée."
+    ALREADY_STOLEN: "Cette moto est déjà déclarée volée.",
+    WRONG_PIN: "Code secret incorrect. Après 5 essais faux, la moto est bloquée 1 heure.",
+    PIN_LOCKED: "Trop de codes faux : cette moto est bloquée pendant 1 heure.",
+    MOTO_STOLEN: "Cette moto est déclarée volée : le transfert est refusé. Prévenez la police.",
+    MOTO_STOLEN_DUPLICATE: "Ces numéros correspondent à une moto déclarée volée. Ne l’enregistrez pas et prévenez la police.",
+    NUMBER_EXISTS: "Un de ces numéros est déjà enregistré sur une autre moto.",
+    SAME_OWNER: "Le nouveau propriétaire est déjà le propriétaire actuel."
   };
   var ROLE = { CENTRAL: "Direction générale", COMMISSARIAT: "Commissariat", AGENT: "Agent de terrain", BUREAU_RESP: "Responsable de bureau", BUREAU_AGENT: "Agent de bureau" };
   var COMMUNES = ["Commune I", "Commune II", "Commune III", "Commune IV", "Commune V", "Commune VI"];
@@ -90,6 +96,7 @@
     $("#tab-alertes").hidden = bureau;
     $("#tab-enreg").hidden = !bureau;
     $("#tab-vol").hidden = !bureau;
+    $("#tab-transfert").hidden = !bureau;
     $("#rec-com-field").hidden = me.role !== "CENTRAL";
     var canAdmin = me.role === "CENTRAL" || me.role === "COMMISSARIAT" || me.role === "BUREAU_RESP";
     $("#tab-comptes").hidden = !canAdmin;
@@ -139,6 +146,16 @@
     if (!d.found) {
       box.appendChild(status("unknown", "Non enregistrée", "Le numéro " + q.toUpperCase() + " ne figure pas dans le registre."));
       box.appendChild(el("p", "note", "Contrôler les papiers du conducteur et comparer avec les numéros gravés sur le cadre et le moteur."));
+      if (d.matches && d.matches.length) {
+        box.appendChild(el("h3", null, "Numéros proches dans le registre"));
+        var ul = el("div", "actions");
+        d.matches.forEach(function (c) {
+          var b = el("button", "btn btn-ghost btn-sm", c.plate + " · " + c.brand + " " + c.model + (c.status === "STOLEN" ? " · VOLÉE" : "")); b.type = "button";
+          b.addEventListener("click", function () { $("#pol-q").value = c.plate; $("#pol-form").dispatchEvent(new Event("submit", { cancelable: true })); });
+          ul.appendChild(b);
+        });
+        box.appendChild(ul);
+      }
       return box;
     }
     var rows = [["Plaque", d.plate, 1], ["Marque et modèle", d.brand + " " + d.model], ["Couleur", d.color], ["Année", d.year], ["N° de châssis", d.chassis, 1], ["N° de moteur", d.engine, 1],
@@ -171,7 +188,17 @@
   /* ---------- alertes ---------- */
   var cs = $("#a-commune"); cs.appendChild(new Option("Toutes les communes", "")); COMMUNES.forEach(function (c) { cs.appendChild(new Option(c, c)); });
   var rc = $("#rec-commune"); COMMUNES.forEach(function (c) { rc.appendChild(new Option(c, c)); });
-  ["r-commune", "v-commune"].forEach(function (id) { var sel = $("#" + id); sel.appendChild(new Option("Choisir", "")); COMMUNES.forEach(function (c) { sel.appendChild(new Option(c, c)); }); });
+  ["r-commune", "v-commune", "t-commune"].forEach(function (id) { var sel = $("#" + id); sel.appendChild(new Option("Choisir", "")); COMMUNES.forEach(function (c) { sel.appendChild(new Option(c, c)); }); });
+  $("#a-export").addEventListener("click", function () {
+    var u = "/api/police/alerts.csv?status=" + encodeURIComponent($("#a-status").value) + "&q=" + encodeURIComponent($("#a-q").value) + "&commune=" + encodeURIComponent($("#a-commune").value);
+    fetch(u, { credentials: "same-origin" }).then(function (r) {
+      if (!r.ok) { var e = new Error("EXPORT"); e.status = r.status; throw e; }
+      return r.blob();
+    }).then(function (b) {
+      var a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = "alertes-motosur.csv"; document.body.appendChild(a); a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000); toast("Fichier téléchargé.");
+    }).catch(function (e) { if (e && (e.status === 401 || e.status === 403)) authLoss(e); else toast("Export impossible pour le moment."); });
+  });
   var aT; function reloadSoon() { clearTimeout(aT); aT = setTimeout(loadAlerts, 250); }
   $("#a-q").addEventListener("input", reloadSoon); $("#a-commune").addEventListener("change", loadAlerts); $("#a-status").addEventListener("change", loadAlerts);
   function loadAlerts() {
@@ -344,6 +371,45 @@
       });
     }).catch(authLoss);
   }
+
+
+  /* ---------- bureau : transfert de propriété ---------- */
+  function transferNode(d) {
+    var n = el("div");
+    var hd = el("div", "pz-head"); hd.appendChild(el("small", null, "République du Mali · Registre des motos")); hd.appendChild(el("h1", null, "MotoSûr Mali · Reçu de transfert de propriété")); n.appendChild(hd);
+    n.appendChild(el("p", "pz-sub", d.receipt + " · " + fmtDT(d.registeredAt) + " · " + (d.section || "")));
+    n.appendChild(pzDl([["Ancien propriétaire", d.fromName], ["Nouveau propriétaire", d.ownerName], ["Téléphone", phone(d.ownerPhone)], ["Plaque", d.plate], ["Marque et modèle", d.brand + " " + d.model + " · " + d.color + " · " + d.year], ["N° de châssis", d.chassis], ["N° de moteur", d.engine], ["Montant payé", d.amount + " FCFA (" + d.paymentMode + ")"], ["Traité par", d.agent + " · relu par " + d.checkedBy]]));
+    n.appendChild(el("h2", null, "Numéro d’enregistrement : " + d.reference));
+    n.appendChild(el("div", "pz-code", d.pin));
+    n.appendChild(el("p", "pz-note", "Nouveau code secret du propriétaire. L’ancien code ne fonctionne plus. Ne donnez ce code à personne."));
+    var sg = el("div", "pz-sign"); sg.appendChild(el("div", null, "Signature du vendeur")); sg.appendChild(el("div", null, "Signature de l’acheteur")); sg.appendChild(el("div", null, "Cachet et signature du bureau")); n.appendChild(sg);
+    n.appendChild(el("p", "pz-foot", "MotoSûr Mali · Ce reçu prouve le changement de propriétaire au registre. Il ne remplace pas les papiers de la moto."));
+    return n;
+  }
+  $("#trf-form").addEventListener("submit", function (ev) {
+    ev.preventDefault(); showErr("t-err", ""); var f = ev.target;
+    var need = ["t-q", "t-pin", "t-owner", "t-phone", "t-commune", "t-checker"];
+    for (var k = 0; k < need.length; k++) { if (!reqVal(need[k])) { showErr("t-err", "Renseignez tous les champs."); $("#" + need[k]).focus(); return; } }
+    if (!/^\d{4}$/.test(reqVal("t-pin"))) { showErr("t-err", "Le code secret a 4 chiffres."); $("#t-pin").focus(); return; }
+    if (!$("#t-chk1").checked || !$("#t-chk2").checked) { showErr("t-err", ERR.CHECKS_REQUIRED); return; }
+    var body = { q: reqVal("t-q"), pin: reqVal("t-pin"), newOwnerName: reqVal("t-owner"), phone: reqVal("t-phone"), commune: reqVal("t-commune"), checkedBy: reqVal("t-checker"),
+      amount: parseInt($("#t-amount").value, 10) || 0, paymentMode: $("#t-mode").value, idsSeen: $("#t-chk1").checked, papersSeen: $("#t-chk2").checked };
+    busy(f, true);
+    api("POST", "/api/bureau/motos/transfer", body).then(function (d) {
+      var done = $("#trf-done"); done.replaceChildren();
+      done.appendChild(status("ok", "Moto transférée au nouveau propriétaire", "Remettez le reçu à l’acheteur."));
+      var ref = el("div", "cert-ref"); ref.appendChild(el("span", null, "Numéro d’enregistrement")); ref.appendChild(el("span", "mono", d.reference)); done.appendChild(ref);
+      var pin = el("div", "cert-ref"); pin.appendChild(el("span", null, "Nouveau code secret")); var pv = el("span", "mono", d.pin); pv.style.cssText = "font-size:1.6rem;letter-spacing:.3em"; pin.appendChild(pv); done.appendChild(pin);
+      done.appendChild(dl([["Reçu", d.receipt, 1], ["Plaque", d.plate, 1], ["Ancien propriétaire", d.fromName], ["Nouveau propriétaire", d.ownerName], ["Téléphone", phone(d.ownerPhone), 1], ["Montant payé", d.amount + " FCFA · " + d.paymentMode]]));
+      done.appendChild(el("p", "note", "Le code secret n’est affiché qu’une fois. L’ancien code ne marche plus."));
+      var act = el("div", "actions");
+      var pr = el("button", "btn btn-primary", "Imprimer le reçu"); pr.type = "button"; pr.addEventListener("click", function () { printNode(transferNode(d)); });
+      var again = el("button", "btn btn-ghost", "Autre transfert"); again.type = "button";
+      again.addEventListener("click", function () { f.reset(); $("#t-amount").value = 2000; done.hidden = true; $("#trf-card").hidden = false; $("#t-q").focus(); });
+      act.appendChild(pr); act.appendChild(again); done.appendChild(act);
+      $("#trf-card").hidden = true; done.hidden = false; done.scrollIntoView({ block: "start" });
+    }).catch(function (e) { if ((e.status === 401 || e.status === 403) && e.message !== "WRONG_PIN") authLoss(e); else showErr("t-err", msg(e)); }).then(function () { busy(f, false); });
+  });
 
   /* ---------- bureau : déclaration de vol ---------- */
   $("#vol-form").addEventListener("submit", function (ev) {

@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -23,6 +24,8 @@ import ml.motosur.domain.Theft;
 import ml.motosur.domain.TheftRepository;
 import ml.motosur.service.AuditService;
 import ml.motosur.service.SmsService;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
@@ -91,6 +94,20 @@ public class PoliceController {
         Moto m = n.length() < 4 ? null : motos.findFirstByPlateOrChassisOrEngine(n, n, n).orElse(null);
         if (m == null) {
             out.put("found", false);
+            // Aucun numéro exact : proposer les motos dont la plaque, le châssis ou le moteur contient le texte.
+            List<Map<String, Object>> close = new ArrayList<>();
+            if (n.length() >= 4) {
+                for (Moto c : motos.search(n, PageRequest.of(0, 10))) {
+                    Map<String, Object> o = new LinkedHashMap<>();
+                    o.put("plate", c.plate);
+                    o.put("brand", c.brand);
+                    o.put("model", c.model);
+                    o.put("color", c.color);
+                    o.put("status", c.status.name());
+                    close.add(o);
+                }
+            }
+            out.put("matches", close);
             return out;
         }
         out.put("found", true);
@@ -134,6 +151,46 @@ public class PoliceController {
             out.add(alertView(t));
         }
         return out;
+    }
+
+    /** Export des alertes (mêmes filtres que la liste) au format CSV, lisible dans Excel. */
+    @GetMapping("/alerts.csv")
+    @Transactional(readOnly = true)
+    public ResponseEntity<byte[]> alertsCsv(@RequestParam(defaultValue = "active") String status,
+                                            @RequestParam(defaultValue = "") String q,
+                                            @RequestParam(defaultValue = "") String commune,
+                                            HttpServletRequest req) {
+        List<Map<String, Object>> rows = alerts(status, q, commune);
+        audit.log(me().login, "POLICE_EXPORT", "alertes " + status + " (" + rows.size() + " lignes)", req.getRemoteAddr());
+        StringBuilder sb = new StringBuilder("\uFEFF");
+        sb.append("Alerte;Plaque;Marque;Modèle;Couleur;Date du vol;Commune;Lieu;Propriétaire;Téléphone;Statut;Déclarée le;Retrouvée le;Commissariat\r\n");
+        for (Map<String, Object> o : rows) {
+            String[] cells = {
+                    str(o.get("reference")), str(o.get("plate")), str(o.get("brand")), str(o.get("model")), str(o.get("color")),
+                    str(o.get("theftDate")), str(o.get("theftCommune")), str(o.get("place")), str(o.get("ownerName")),
+                    str(o.get("ownerPhone")), "STOLEN".equals(str(o.get("status"))) ? "Volée" : "Retrouvée",
+                    str(o.get("reportedAt")), str(o.get("recoveredAt")), str(o.get("recoveredCommissariat"))};
+            for (int i = 0; i < cells.length; i++) {
+                if (i > 0) sb.append(';');
+                sb.append(csvCell(cells[i]));
+            }
+            sb.append("\r\n");
+        }
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_TYPE, "text/csv; charset=UTF-8")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"alertes-motosur.csv\"")
+                .body(sb.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String str(Object v) {
+        return v == null ? "" : String.valueOf(v);
+    }
+
+    /** Protège contre l'injection de formule dans Excel (cellule commençant par = + - @). */
+    private static String csvCell(String v) {
+        String s = v;
+        if (!s.isEmpty() && "=+-@\t\r".indexOf(s.charAt(0)) >= 0) s = "'" + s;
+        return "\"" + s.replace("\"", "\"\"") + "\"";
     }
 
     @PostMapping("/motos/{id}/recovered")

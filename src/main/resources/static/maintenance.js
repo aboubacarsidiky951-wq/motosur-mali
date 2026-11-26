@@ -14,7 +14,12 @@
     INVALID_PHONE: "Numéro de téléphone invalide : 8 chiffres attendus.",
     INVALID_NAME: "Indiquez le nom de la personne.",
     ROLE_NOT_ALLOWED: "Action non autorisée sur ce niveau.",
-    NOT_FOUND: "Compte introuvable."
+    NOT_FOUND: "Compte introuvable.",
+    TOTP_REQUIRED: "Saisissez aussi le code à 6 chiffres de votre application d’authentification.",
+    INVALID_CODE: "Code incorrect ou expiré. Attendez le prochain code et réessayez.",
+    ALREADY_ENABLED: "La double vérification est déjà active.",
+    NO_SETUP: "Recommencez l’activation.",
+    NOT_ENABLED: "La double vérification n’est pas active."
   };
   var ROLES = { MAINTENANCE: "Maintenance", CENTRAL: "Direction générale", COMMISSARIAT: "Commissariat", AGENT: "Agent", BUREAU_RESP: "Responsable de bureau", BUREAU_AGENT: "Agent de bureau" };
   var me = null;
@@ -88,7 +93,7 @@
     if (name === "accounts") loadAccounts();
     if (name === "audit") loadAudit();
     if (name === "cash") loadCash();
-    if (name === "me") $("me-info").textContent = me.name + " · " + me.login;
+    if (name === "me") { $("me-info").textContent = me.name + " · " + me.login; loadTfa(); }
   }
   document.querySelectorAll("[data-tab]").forEach(function (b) {
     b.addEventListener("click", function () { selectTab(b.getAttribute("data-tab")); });
@@ -107,10 +112,53 @@
     var f = ev.target, login = $("l-login").value.trim(), pass = $("l-pass").value;
     if (!login || !pass) { showErr("l-err", "Saisissez l’email et le mot de passe."); return; }
     busy(f, true);
-    api("POST", "/api/auth/login", { login: login, password: pass }).then(function (m) {
-      me = m; $("l-pass").value = ""; route();
-    }).catch(function (e) { showErr("l-err", msg(e)); }).then(function () { busy(f, false); });
+    var body = { login: login, password: pass };
+    if (!$("l-code-field").hidden) body.code = $("l-code").value.trim();
+    api("POST", "/api/auth/login", body).then(function (m) {
+      me = m; $("l-pass").value = ""; $("l-code").value = ""; $("l-code-field").hidden = true; route();
+    }).catch(function (e) {
+      if (e.message === "TOTP_REQUIRED") { $("l-code-field").hidden = false; $("l-code").focus(); }
+      showErr("l-err", msg(e));
+    }).then(function () { busy(f, false); });
   });
+
+  /* ---------- Double vérification ---------- */
+  function loadTfa() {
+    api("GET", "/api/maintenance/2fa/status").then(function (s) {
+      $("tfa-state").textContent = s.enabled ? "Active : un code à 6 chiffres est demandé à chaque connexion." : "Non active. Activez-la : un mot de passe seul ne suffit pas pour protéger la caisse et les données.";
+      $("tfa-start").hidden = s.enabled; $("tfa-disable-form").hidden = !s.enabled; $("tfa-setup").hidden = true;
+    }).catch(function () { $("tfa-state").textContent = "Impossible de lire l’état pour le moment."; });
+  }
+  $("tfa-start").addEventListener("click", function () {
+    showErr("tfa-err", "");
+    api("POST", "/api/maintenance/2fa/setup").then(function (d) {
+      $("tfa-secret").textContent = d.secret.replace(/(.{4})/g, "$1 ").trim();
+      var cv = $("tfa-qr"), ctx = cv.getContext("2d");
+      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cv.width, cv.height);
+      try {
+        var q = qrcode(0, "M"); q.addData(d.uri); q.make();
+        var n = q.getModuleCount(), quiet = 4, cell = Math.floor(cv.width / (n + quiet * 2)), off = Math.floor((cv.width - cell * n) / 2);
+        ctx.fillStyle = "#000";
+        for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (q.isDark(r, c)) ctx.fillRect(off + c * cell, off + r * cell, cell, cell);
+      } catch (e) { /* la clé écrite reste utilisable */ }
+      $("tfa-setup").hidden = false; $("tfa-start").hidden = true; $("tfa-code").value = ""; $("tfa-code").focus();
+    }).catch(function (e) { if (e.status === 401 || e.status === 403) handleAuthLoss(e); else toast(msg(e)); });
+  });
+  $("tfa-enable-form").addEventListener("submit", function (ev) {
+    ev.preventDefault(); showErr("tfa-err", ""); var f = ev.target;
+    busy(f, true);
+    api("POST", "/api/maintenance/2fa/enable", { code: $("tfa-code").value.trim() }).then(function () {
+      toast("Double vérification activée."); loadTfa();
+    }).catch(function (e) { if (e.status === 401 || e.status === 403) handleAuthLoss(e); else showErr("tfa-err", msg(e)); }).then(function () { busy(f, false); });
+  });
+  $("tfa-disable-form").addEventListener("submit", function (ev) {
+    ev.preventDefault(); showErr("tfa-d-err", ""); var f = ev.target;
+    busy(f, true);
+    api("POST", "/api/maintenance/2fa/disable", { password: $("tfa-d-pass").value, code: $("tfa-d-code").value.trim() }).then(function () {
+      $("tfa-d-pass").value = ""; $("tfa-d-code").value = ""; toast("Double vérification désactivée."); loadTfa();
+    }).catch(function (e) { if (e.status === 401 || e.status === 403) handleAuthLoss(e); else showErr("tfa-d-err", msg(e)); }).then(function () { busy(f, false); });
+  });
+
   $("logout").addEventListener("click", function () {
     api("POST", "/api/auth/logout").catch(function () {}).then(function () { me = null; show("view-login"); });
   });

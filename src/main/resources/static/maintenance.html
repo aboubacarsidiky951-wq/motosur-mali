@@ -49,6 +49,7 @@
       <form id="login-form" novalidate>
         <div class="field"><label for="l-login">Email ou numéro de téléphone</label><input id="l-login" type="text" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
         <div class="field"><label for="l-pass">Mot de passe</label><input id="l-pass" type="password" autocomplete="current-password"></div>
+        <div class="field" id="l-code-field" hidden><label for="l-code">Code de double vérification</label><input id="l-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="6 chiffres"></div>
         <p class="err" id="l-err" role="alert" hidden></p>
         <button class="btn btn-primary" type="submit">Se connecter</button>
       </form>
@@ -158,13 +159,36 @@
         <p id="me-info"></p>
         <div class="actions"><button type="button" class="btn btn-secondary" id="open-password">Changer mon mot de passe</button></div>
       </div>
+      <div class="card stack-sm" id="tfa-card">
+        <h2>Double vérification</h2>
+        <p id="tfa-state">Chargement…</p>
+        <div class="actions"><button type="button" class="btn btn-primary" id="tfa-start" hidden>Activer la double vérification</button></div>
+        <div id="tfa-setup" class="stack-sm" hidden>
+          <p>1. Dans une application d’authentification (Google Authenticator, Microsoft Authenticator ou Authy), ajoutez un compte en scannant ce code.</p>
+          <canvas id="tfa-qr" width="300" height="300" aria-label="QR code à scanner" style="max-width:100%;background:#fff;border-radius:8px"></canvas>
+          <p class="hint">Si vous ne pouvez pas scanner, entrez cette clé à la main : <b class="mono" id="tfa-secret"></b></p>
+          <form id="tfa-enable-form" novalidate>
+            <div class="field"><label for="tfa-code">2. Saisissez le code à 6 chiffres affiché dans l’application</label><input id="tfa-code" type="text" inputmode="numeric" autocomplete="off" maxlength="8"></div>
+            <p class="err" id="tfa-err" role="alert" hidden></p>
+            <div class="actions"><button type="submit" class="btn btn-primary">Confirmer et activer</button></div>
+          </form>
+        </div>
+        <form id="tfa-disable-form" class="stack-sm" novalidate hidden>
+          <p>Pour désactiver, confirmez avec votre mot de passe et un code actuel.</p>
+          <div class="field"><label for="tfa-d-pass">Mot de passe</label><input id="tfa-d-pass" type="password" autocomplete="current-password"></div>
+          <div class="field"><label for="tfa-d-code">Code à 6 chiffres</label><input id="tfa-d-code" type="text" inputmode="numeric" autocomplete="off" maxlength="8"></div>
+          <p class="err" id="tfa-d-err" role="alert" hidden></p>
+          <div class="actions"><button type="submit" class="btn btn-secondary">Désactiver</button></div>
+        </form>
+      </div>
     </div>
   </section>
 
 </main>
 <div id="toast" role="status" aria-live="polite"><span></span></div>
 <div id="print-zone" aria-hidden="true"></div>
-<script src="maintenance.js?v=7"></script>
+<script src="qr.js?v=1"></script>
+<script src="maintenance.js?v=8"></script>
 <script src="pwa.js?v=1"></script>
 </body>
 </html>

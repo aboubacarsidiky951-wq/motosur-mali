@@ -55,4 +55,15 @@ public class Account {
     public Instant createdAt = Instant.now();
 
     public Instant lastLoginAt;
+
+    /** Double vérification (comptes de maintenance) : clé secrète TOTP, active seulement après confirmation. */
+    @Column(length = 64)
+    public String totpSecret;
+
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    public boolean totpEnabled;
+
+    /** Dernier pas de 30 s accepté : un même code ne peut pas servir deux fois. */
+    @Column(nullable = false, columnDefinition = "bigint default 0")
+    public long lastTotpStep;
 }
